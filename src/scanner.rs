@@ -1,7 +1,8 @@
 use crate::reporter::Reporter;
-use crate::token::{Literal, Token, TokenKind};
+use crate::token::{Literal, Token, TokenKind, KEYWORDS};
 use crate::ErrorCode;
-use std::collections::LinkedList;
+
+use std::{collections::LinkedList, str::FromStr};
 
 /// A code scanner using lexical grammar to tokens
 #[derive(Debug, Default)]
@@ -40,7 +41,7 @@ impl Scanner {
         while !self.is_at_end() {
             // Start from the beginning of the next lexeme
             self.start = self.current;
-            self.scan_token()?;
+            self.process_next_token()?;
         }
 
         self.tokens
@@ -51,18 +52,22 @@ impl Scanner {
 
 /// Internal method implementation
 impl Scanner {
-    fn scan_token(&mut self) -> Result<(), ErrorCode> {
+    fn process_next_token(&mut self) -> Result<(), ErrorCode> {
         match self.advance() {
             Some(c) => {
-                if self.scan_comparator_char_token(c)
-                    || self.scan_comment_char_token(c)
-                    || self.scan_single_char_token(c)
-                    || self.scan_ignored_char(c)
+                // Note: The match order is done with priority to avoid matching to the wrong token
+                if self.process_comparator_char_token(c)
+                    || self.process_comment_char_token(c)
+                    || self.process_identifier_token(c)
+                    || self.process_number_token(c)
+                    || self.process_string_token(c)
+                    || self.process_single_char_token(c)
+                    || self.process_ignored_char(c)
                 {
                     // Do nothing if the operation succeeds
                 } else {
-                    log::warn!("Unable to complete single character scan");
-                    Reporter::error(self.line, "Unexpected character: expected single char");
+                    log::warn!("Unable to complete for character");
+                    Reporter::error(self.line, &format!("Unexpected character: {}", c));
                 }
                 Ok(())
             }
@@ -73,7 +78,7 @@ impl Scanner {
         }
     }
 
-    fn scan_comparator_char_token(&mut self, c: char) -> bool {
+    fn process_comparator_char_token(&mut self, c: char) -> bool {
         let next_match_equal = self.next_match_char('=');
         match c {
             '!' => self.add_token(
@@ -116,7 +121,8 @@ impl Scanner {
         return true;
     }
 
-    fn scan_comment_char_token(&mut self, c: char) -> bool {
+    fn process_comment_char_token(&mut self, c: char) -> bool {
+        // TODO: Provide support for multi line comment /* .... */
         if c != '/' {
             return false;
         }
@@ -124,14 +130,11 @@ impl Scanner {
         match self.next_match_char('/') {
             true => {
                 // A comment goes until the end of the line.
-                while !self.is_at_end() {
-                    match self.peek() {
-                        Some(c) => {
-                            if c != '\n' {
-                                self.advance();
-                            }
+                while !self.is_at_end() && self.peek(0).is_some() {
+                    if let Some(v) = self.peek(0) {
+                        if v != '\n' {
+                            self.advance();
                         }
-                        None => continue,
                     }
                 }
                 return true;
@@ -140,7 +143,124 @@ impl Scanner {
         }
     }
 
-    fn scan_single_char_token(&mut self, c: char) -> bool {
+    fn process_string_token(&mut self, c: char) -> bool {
+        // TODO: Provide support for ' character
+        match c {
+            '"' => {
+                while !self.is_at_end() {
+                    if let Some(p) = self.peek(0) {
+                        match p {
+                            '"' => break,
+                            '\n' => self.line += 1,
+                            _ => {}
+                        }
+                    }
+                    self.advance();
+                }
+                if self.is_at_end() {
+                    log::warn!("Unexpected character: unterminated string.");
+                    Reporter::error(self.line, "Unexpected character: unterminated string.");
+                    return false;
+                }
+
+                // The closing ".
+                self.advance();
+
+                // Trim the surrounding quotes.
+                let string = &self.source[self.start + 1..self.current - 1];
+                return match Literal::from_str(string) {
+                    Ok(l) => {
+                        self.add_token(TokenKind::String, Some(l));
+                        true
+                    }
+                    Err(_) => {
+                        log::warn!("Unable to convert string to process string");
+                        false
+                    }
+                };
+            }
+            _ => false,
+        }
+    }
+
+    fn process_number_token(&mut self, c: char) -> bool {
+        match c {
+            c if is_digit(c) => {
+                'first_number: loop {
+                    let current = self.peek(0);
+                    if current.is_some() && is_digit(current.unwrap()) {
+                        self.advance();
+                    } else {
+                        break 'first_number;
+                    }
+                }
+
+                // Look for a fractional part.
+                if let Some(v) = self.peek(0) {
+                    match v {
+                        '.' => {
+                            let next = self.peek(1);
+                            if next.is_some() && is_digit(next.unwrap()) {
+                                // Consume the "."
+                                self.advance();
+
+                                'fractional_number: loop {
+                                    let current = self.peek(0);
+                                    if current.is_some() && is_digit(current.unwrap()) {
+                                        self.advance();
+                                    } else {
+                                        break 'fractional_number;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // TODO: Parse string to double or number
+                let number = &self.source[self.start..self.current];
+                return match Literal::from_str(number) {
+                    Ok(l) => {
+                        self.add_token(TokenKind::Number, Some(l));
+                        true
+                    }
+                    Err(_) => {
+                        log::warn!("Unable to convert string to number");
+                        false
+                    }
+                };
+            }
+            _ => false,
+        }
+    }
+
+    fn process_identifier_token(&mut self, c: char) -> bool {
+        match c {
+            c if is_alpha(c) => {
+                loop {
+                    let current = self.peek(0);
+                    if current.is_some() && is_alpha_numeric(current.unwrap()) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+
+                // check if there is a reserved keyword
+                let string = &self.source[self.start..self.current];
+                if KEYWORDS.get(string).is_some() {
+                    return false;
+                }
+                self.add_token(TokenKind::Identifier, None);
+
+                return true;
+            }
+            _ => false,
+        }
+    }
+
+    fn process_single_char_token(&mut self, c: char) -> bool {
         match c {
             '(' => self.add_token(TokenKind::LeftParen, None),
             ')' => self.add_token(TokenKind::RightParen, None),
@@ -161,8 +281,9 @@ impl Scanner {
         return true;
     }
 
-    fn scan_ignored_char(&mut self, c: char) -> bool {
+    fn process_ignored_char(&mut self, c: char) -> bool {
         match c {
+            // Ignore whitespace.
             ' ' | '\r' | '\t' => true,
             '\n' => {
                 self.line += 1;
@@ -193,11 +314,13 @@ impl Scanner {
         return self.source.chars().nth(self.current - 1);
     }
 
-    fn peek(&self) -> Option<char> {
-        if self.is_at_end() {
+    fn peek(&self, to: usize) -> Option<char> {
+        let to_index = self.current + to;
+
+        if self.is_at_end() || to_index >= self.source.len() {
             return Some('\0');
         }
-        return self.source.chars().nth(self.current);
+        return self.source.chars().nth(to_index);
     }
 
     fn next_match_char(&mut self, expected: char) -> bool {
@@ -221,6 +344,17 @@ impl Scanner {
     fn increment_current(&mut self) {
         self.current += 1;
     }
+}
+
+fn is_alpha_numeric(c: char) -> bool {
+    return is_alpha(c) || is_digit(c);
+}
+fn is_digit(c: char) -> bool {
+    return c >= '0' && c <= '9';
+}
+
+fn is_alpha(c: char) -> bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
 }
 
 #[cfg(test)]
@@ -262,10 +396,52 @@ mod scanner_tests {
     }
 
     #[test]
-
     fn test_generates_token_for_multi_comparator_arms() {
         let mut scanner = Scanner::from_source("<=>=!===");
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_ignore_comment_characters() {
+        let mut scanner = Scanner::from_source("// ignored comment character");
+        scanner.scan_tokens().unwrap();
+
+        assert_eq!(scanner.tokens.len(), 1);
+    }
+
+    #[test]
+    fn test_ignore_comment_line() {
+        let mut scanner = Scanner::from_source("!*+-/=<> <= == // operators");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 10);
+    }
+
+    #[test]
+    fn test_generates_token_for_strings() {
+        let mut scanner = Scanner::from_source("\"String character escapes\"");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 2);
+    }
+
+    #[test]
+    fn test_generates_token_for_numbers() {
+        let mut scanner = Scanner::from_source("1234.567");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 2);
+    }
+
+    #[test]
+    fn test_generates_token_for_identifiers() {
+        let mut scanner = Scanner::from_source("idFor1234");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 2);
+    }
+
+    #[test]
+    fn test_ignore_keywords_token() {
+        let mut scanner = Scanner::from_source("and or print 1234 return nil idFor1234");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 3);
     }
 }

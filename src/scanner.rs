@@ -144,7 +144,7 @@ impl Scanner {
     }
 
     fn process_string_token(&mut self, c: char) -> bool {
-        // TODO: Provide support for ' character
+        let string: &str;
         match c {
             '"' => {
                 while !self.is_at_end() {
@@ -167,20 +167,46 @@ impl Scanner {
                 self.advance();
 
                 // Trim the surrounding quotes.
-                let string = &self.source[self.start + 1..self.current - 1];
-                return match Literal::from_str(string) {
-                    Ok(l) => {
-                        self.add_token(TokenKind::String, Some(l));
-                        true
-                    }
-                    Err(_) => {
-                        log::warn!("Unable to convert string to process string");
-                        false
-                    }
-                };
+                string = &self.source[self.start + 1..self.current - 1];
             }
-            _ => false,
-        }
+            '\'' => {
+                while !self.is_at_end() {
+                    if let Some(p) = self.peek(0) {
+                        match p {
+                            '\'' => break,
+                            '\n' => self.line += 1,
+                            _ => {}
+                        }
+                    }
+                    self.advance();
+                }
+                if self.is_at_end() {
+                    log::warn!("Unexpected character: unterminated string.");
+                    Reporter::error(self.line, "Unexpected character: unterminated string.");
+                    return false;
+                }
+
+                // The closing ".
+                self.advance();
+
+                // Trim the surrounding quotes.
+                string = &self.source[self.start + 1..self.current - 1];
+            }
+            _ => {
+                return false;
+            }
+        };
+
+        return match Literal::from_str(string) {
+            Ok(l) => {
+                self.add_token(TokenKind::String, Some(l));
+                true
+            }
+            Err(_) => {
+                log::warn!("Unable to convert string to process string");
+                false
+            }
+        };
     }
 
     fn process_number_token(&mut self, c: char) -> bool {
@@ -420,6 +446,13 @@ mod scanner_tests {
     #[test]
     fn test_generates_token_for_strings() {
         let mut scanner = Scanner::from_source("\"String character escapes\"");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 2);
+    }
+
+    #[test]
+    fn test_generates_token_for_light_string() {
+        let mut scanner = Scanner::from_source("\'String character escapes\'");
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }

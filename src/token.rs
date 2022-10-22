@@ -1,5 +1,6 @@
 use std::{fmt, str};
 
+use crate::ast::expr::{Binary, Grouping, Unary};
 use phf::phf_map;
 
 pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
@@ -90,7 +91,7 @@ impl str::FromStr for Literal {
 #[derive(Debug)]
 pub struct Token {
     kind: TokenKind,
-    lexeme: String,
+    pub lexeme: String,
     literal: Option<Literal>,
     line: i32,
 }

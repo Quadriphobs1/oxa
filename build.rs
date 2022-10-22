@@ -2,7 +2,7 @@
 
 use std::io::{Error, ErrorKind};
 use std::{
-    fs::{create_dir_all, read_dir, remove_dir_all, File},
+    fs::{create_dir_all, read_dir, File},
     io::{LineWriter, Result, Write},
     path::{Path, PathBuf},
 };

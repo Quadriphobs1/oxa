@@ -1,11 +1,3 @@
-mod error;
-mod oxa;
-mod reporter;
-mod scanner;
-mod token;
-
-use crate::error::{exit_with_return_code, ErrorCode};
-use crate::oxa::Oxa;
 use std::env;
 
 fn main() {
@@ -15,7 +7,7 @@ fn main() {
         setup_logger(log::LevelFilter::Info)
     }
 
-    let mut oxa = Oxa::new();
+    let mut oxa = oxa::oxa::Oxa::new();
 
     let args: Vec<String> = env::args().collect();
     match args.len() {
@@ -24,11 +16,11 @@ fn main() {
         }
         2 => {
             log::info!("Starting with a file");
-            exit_with_return_code(oxa.run_file(&args[1]));
+            oxa::error::exit_with_return_code(oxa.run_file(&args[1]));
         }
         _ => {
             log::info!("Starting with prompt");
-            exit_with_return_code(oxa.run_prompt());
+            oxa::error::exit_with_return_code(oxa.run_prompt());
         }
     }
 }

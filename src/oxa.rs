@@ -1,5 +1,4 @@
-use crate::ErrorCode;
-
+use crate::error::ErrorCode;
 use crate::scanner::Scanner;
 use std::fs;
 
@@ -54,7 +53,7 @@ impl Oxa {
 pub fn run(s: &str) -> Result<(), ErrorCode> {
     let mut scanner = Scanner::from_source(s);
 
-    for token in scanner.scan_tokens() {
+    for token in scanner.scan_tokens()? {
         println!("{:?}", token);
     }
     Ok(())

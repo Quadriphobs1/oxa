@@ -1,6 +1,6 @@
+use crate::error::ErrorCode;
 use crate::reporter::Reporter;
 use crate::token::{Literal, Token, TokenKind, KEYWORDS};
-use crate::ErrorCode;
 
 use std::{collections::LinkedList, str::FromStr};
 

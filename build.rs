@@ -54,17 +54,16 @@ impl GenerateAst {
     ///
     /// # Errors
     ///
-    /// This function check for the existence of the provided path and ensures the path is empty.
+    /// This function check for the existence of the provided path.
     /// * The provided `path` doesn't exist
     /// * The `path` points at a non-directory file.
-    /// * The provided directory is not empty
     pub fn for_path(path: PathBuf) -> Result<GenerateAst> {
         // Check if the path exist
         let mut dir = read_dir(&path)?;
-        if dir.next().is_some() {
+        if dir.next().is_none() {
             return Err(Error::new(
-                ErrorKind::DirectoryNotEmpty,
-                "empty the directory to continue",
+                ErrorKind::NotADirectory,
+                "directory doesn't exist",
             ));
         }
         Ok(GenerateAst { out_dir: path })
@@ -184,7 +183,7 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
         writer.write_all(
             format!(
-                "        return visitor.visit_{}_{}();",
+                "        return visitor.visit_{}_{}(self);",
                 struct_name.to_lowercase(),
                 base_name.to_lowercase()
             )
@@ -208,7 +207,7 @@ fn main() {
     //     std::process::exit(64);
     // }
 
-    const AST_DIR: &str = "./src/generated/";
+    const AST_DIR: &str = "./src/ast/";
     let path = PathBuf::from(AST_DIR);
     create_or_empty_dir(&path).unwrap();
 
@@ -220,23 +219,17 @@ fn main() {
         (
             "Binary",
             vec![
-                ("left", "dyn Box<dyn Expr + 'static>"),
+                ("left", "Box<dyn Expr + 'static>"),
                 ("operator", "Token"),
-                ("right", "dyn Box<dyn Expr + 'static>"),
+                ("right", "Box<dyn Expr + 'static>"),
             ],
         ),
-        (
-            "Grouping",
-            vec![("expression", "dyn Box<dyn Expr + 'static>")],
-        ),
+        ("Grouping", vec![("expression", "Box<dyn Expr + 'static>")]),
         // TODO: Fix Object to struct field mapping
         ("Literal", vec![("value", "String")]),
         (
             "Unary",
-            vec![
-                ("operator", "Token"),
-                ("right", "dyn Box<dyn Expr + 'static>"),
-            ],
+            vec![("operator", "Token"), ("right", "Box<dyn Expr + 'static>")],
         ),
     ];
     generator.define_ast("Expr", &expressions).unwrap();
@@ -248,7 +241,7 @@ fn main() {
 /// Created a directory with the provided path or delete the directory if it exist and has a file
 fn create_or_empty_dir(path: &Path) -> Result<()> {
     if read_dir(&path).is_ok() {
-        remove_dir_all(path).unwrap()
+        return Ok(());
     }
     let res = create_dir_all(&path);
     match &res {

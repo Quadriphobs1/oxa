@@ -87,7 +87,7 @@ impl GenerateAst {
         let mut writer = LineWriter::new(file);
 
         writer.write_all(b"use std::marker;\n")?;
-        writer.write_all(b"use crate::token::Token;")?;
+        writer.write_all(b"use crate::token;")?;
         writer.write_all(b"\n\n")?;
 
         // Expr
@@ -260,16 +260,18 @@ fn main() {
             "Binary",
             vec![
                 ("left", "Box<dyn Expr<T, V>>"),
-                ("operator", "Token"),
+                ("operator", "token::Token"),
                 ("right", "Box<dyn Expr<T, V>>"),
             ],
         ),
         ("Grouping", vec![("expression", "Box<dyn Expr<T, V>>")]),
-        // TODO: Fix Object to struct field mapping
-        ("Literal", vec![("value", "String")]),
+        ("Literal", vec![("value", "token::Literal")]),
         (
             "Unary",
-            vec![("operator", "Token"), ("right", "Box<dyn Expr<T, V>>")],
+            vec![
+                ("operator", "token::Token"),
+                ("right", "Box<dyn Expr<T, V>>"),
+            ],
         ),
     ];
     generator.define_ast("Expr", &expressions).unwrap();

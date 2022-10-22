@@ -34,10 +34,13 @@ impl AstPrinter {
 /// # Example
 ///
 /// ```
-/// use oxa::{ast::{expr::{Unary, Literal}, printer::AstPrinter}, token::{Token, TokenKind}};
+/// use oxa::{ast::{expr::{Unary, Literal}, printer::AstPrinter}, token::{Token, TokenKind}, token};
 /// use oxa::ast::printer::parenthesize;
 ///
-/// let expr = Unary::new(Token::new(TokenKind::Plus, "+", None, 1), Box::new(Literal::new("2".to_string())));
+/// let expr = Unary::new(
+///     Token::new(TokenKind::Plus, "+", None, 1),
+///     Box::new(Literal::new(token::Literal::from(2)))
+/// );
 /// let printer = AstPrinter {};
 /// let value = parenthesize(&printer, &expr.operator.lexeme, &vec![&expr.right]);
 ///
@@ -67,14 +70,15 @@ pub fn parenthesize<V: Visitor<String>>(
 mod parenthesize_tests {
     use crate::ast::expr::{Binary, Grouping, Literal, Unary};
     use crate::ast::printer::{parenthesize, AstPrinter};
+    use crate::token;
     use crate::token::{Token, TokenKind};
 
     #[test]
     fn parenthesize_binary_expr() {
         let expr = Binary::new(
-            Box::new(Literal::new("1".to_string())),
+            Box::new(Literal::new(token::Literal::from(1))),
             Token::new(TokenKind::Plus, "+", None, 1),
-            Box::new(Literal::new("2".to_string())),
+            Box::new(Literal::new(token::Literal::from(2))),
         );
 
         let printer = AstPrinter {};
@@ -93,10 +97,12 @@ mod parenthesize_tests {
         let expr = Binary::new(
             Box::new(Unary::new(
                 Token::new(TokenKind::Minus, "-", None, 1),
-                Box::new(Literal::new("123".to_string())),
+                Box::new(Literal::new(token::Literal::from(123))),
             )),
             Token::new(TokenKind::Star, "*", None, 1),
-            Box::new(Grouping::new(Box::new(Literal::new("45.67".to_string())))),
+            Box::new(Grouping::new(Box::new(Literal::new(token::Literal::from(
+                45.67,
+            ))))),
         );
         let printer = AstPrinter {};
         let value = printer.print(Box::new(expr));

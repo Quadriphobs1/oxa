@@ -1,7 +1,6 @@
-use std::{fmt, str};
-
-use crate::ast::expr::{Binary, Grouping, Unary};
 use phf::phf_map;
+
+use std::{fmt, str};
 
 pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "and" => TokenKind::And,
@@ -74,8 +73,30 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Default)]
+pub enum LiteralKind {
+    Number(i32),
+    Float(f32),
+    String(String),
+    Bool(bool),
+    #[default]
+    Nil,
+}
+
+#[derive(Debug, Default)]
 pub struct Literal {
-    value: String,
+    value: LiteralKind,
+}
+
+impl ToString for Literal {
+    fn to_string(&self) -> String {
+        match &self.value {
+            LiteralKind::Number(n) => n.to_string(),
+            LiteralKind::Float(f) => f.to_string(),
+            LiteralKind::Bool(b) => b.to_string(),
+            LiteralKind::String(s) => s.to_string(),
+            LiteralKind::Nil => "Nil".to_string(),
+        }
+    }
 }
 
 impl str::FromStr for Literal {
@@ -83,8 +104,32 @@ impl str::FromStr for Literal {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Literal {
-            value: s.to_string(),
+            value: LiteralKind::String(s.to_string()),
         })
+    }
+}
+
+impl From<f32> for Literal {
+    fn from(f: f32) -> Self {
+        Literal {
+            value: LiteralKind::Float(f),
+        }
+    }
+}
+
+impl From<bool> for Literal {
+    fn from(b: bool) -> Self {
+        Literal {
+            value: LiteralKind::Bool(b),
+        }
+    }
+}
+
+impl From<i32> for Literal {
+    fn from(i: i32) -> Self {
+        Literal {
+            value: LiteralKind::Number(i),
+        }
     }
 }
 

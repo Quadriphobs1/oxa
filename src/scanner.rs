@@ -11,7 +11,7 @@ pub struct Scanner {
     tokens: LinkedList<Token>,
     start: usize,
     current: usize,
-    line: i32,
+    line: usize,
 }
 
 /// Constructor implementation
@@ -67,7 +67,7 @@ impl Scanner {
                     // Do nothing if the operation succeeds
                 } else {
                     log::warn!("Unable to complete for character");
-                    Reporter::error(self.line, &format!("Unexpected character: {}", c));
+                    Reporter::line_error(self.line, &format!("Unexpected character: {}", c));
                 }
                 Ok(())
             }
@@ -159,7 +159,7 @@ impl Scanner {
                 }
                 if self.is_at_end() {
                     log::warn!("Unexpected character: unterminated string.");
-                    Reporter::error(self.line, "Unexpected character: unterminated string.");
+                    Reporter::line_error(self.line, "Unexpected character: unterminated string.");
                     return false;
                 }
 
@@ -182,7 +182,7 @@ impl Scanner {
                 }
                 if self.is_at_end() {
                     log::warn!("Unexpected character: unterminated string.");
-                    Reporter::error(self.line, "Unexpected character: unterminated string.");
+                    Reporter::line_error(self.line, "Unexpected character: unterminated string.");
                     return false;
                 }
 

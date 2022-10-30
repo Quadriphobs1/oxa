@@ -21,7 +21,7 @@ pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "while" => TokenKind::While,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     // Single-character tokens.
     LeftParen,
@@ -72,7 +72,7 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum LiteralKind {
     Number(i32),
     Float(f32),
@@ -82,7 +82,7 @@ pub enum LiteralKind {
     Nil,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Literal {
     value: LiteralKind,
 }
@@ -135,14 +135,14 @@ impl From<i32> for Literal {
 
 #[derive(Debug)]
 pub struct Token {
-    kind: TokenKind,
+    pub kind: TokenKind,
     pub lexeme: String,
-    literal: Option<Literal>,
-    line: i32,
+    pub literal: Option<Literal>,
+    pub line: usize,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, lexeme: &str, literal: Option<Literal>, line: i32) -> Self {
+    pub fn new(kind: TokenKind, lexeme: &str, literal: Option<Literal>, line: usize) -> Self {
         Token {
             kind,
             lexeme: lexeme.to_string(),
@@ -155,5 +155,21 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?} {:?} {:?}", self.kind, self.lexeme, self.literal)
+    }
+}
+
+impl ToOwned for Token {
+    type Owned = Self;
+
+    fn to_owned(&self) -> Self::Owned {
+        Token {
+            kind: self.kind.clone(),
+            lexeme: String::from(&self.lexeme),
+            literal: match &self.literal {
+                Some(l) => Some(l.clone()),
+                None => None,
+            },
+            line: self.line,
+        }
     }
 }

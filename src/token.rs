@@ -21,7 +21,7 @@ pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "while" => TokenKind::While,
 };
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
     // Single-character tokens.
     LeftParen,
@@ -72,7 +72,53 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, Default, Clone)]
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::LeftParen => write!(f, "("),
+            TokenKind::RightParen => write!(f, ")"),
+            TokenKind::LeftBrace => write!(f, "{{"),
+            TokenKind::RightBrace => write!(f, "}}"),
+            TokenKind::Comma => write!(f, ","),
+            TokenKind::Dot => write!(f, "."),
+            TokenKind::SemiColon => write!(f, ";"),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Plus => write!(f, "+"),
+            TokenKind::Slash => write!(f, "/"),
+            TokenKind::Star => write!(f, "*"),
+            TokenKind::Bang => write!(f, "!"),
+            TokenKind::BangEqual => write!(f, "!="),
+            TokenKind::Equal => write!(f, "="),
+            TokenKind::EqualEqual => write!(f, "=="),
+            TokenKind::Greater => write!(f, ">"),
+            TokenKind::GreaterEqual => write!(f, ">="),
+            TokenKind::Less => write!(f, "<"),
+            TokenKind::LessEqual => write!(f, "<="),
+            TokenKind::Identifier => write!(f, "identifier"),
+            TokenKind::String => write!(f, "string"),
+            TokenKind::Number => write!(f, "number"),
+            TokenKind::And => write!(f, "and"),
+            TokenKind::Class => write!(f, "class"),
+            TokenKind::Else => write!(f, "else"),
+            TokenKind::False => write!(f, "false"),
+            TokenKind::Fun => write!(f, "fun"),
+            TokenKind::For => write!(f, "for"),
+            TokenKind::If => write!(f, "if"),
+            TokenKind::Nil => write!(f, "nil"),
+            TokenKind::Or => write!(f, "or"),
+            TokenKind::Print => write!(f, "print"),
+            TokenKind::Return => write!(f, "return"),
+            TokenKind::Super => write!(f, "super"),
+            TokenKind::This => write!(f, "this"),
+            TokenKind::True => write!(f, "true"),
+            TokenKind::Var => write!(f, "var"),
+            TokenKind::While => write!(f, "while"),
+            TokenKind::Eof => write!(f, "Eof"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum LiteralKind {
     Number(i32),
     Float(f32),
@@ -82,21 +128,21 @@ pub enum LiteralKind {
     Nil,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Literal {
-    value: LiteralKind,
-}
-
-impl ToString for Literal {
-    fn to_string(&self) -> String {
-        match &self.value {
-            LiteralKind::Number(n) => n.to_string(),
-            LiteralKind::Float(f) => f.to_string(),
-            LiteralKind::Bool(b) => b.to_string(),
-            LiteralKind::String(s) => s.to_string(),
-            LiteralKind::Nil => "Nil".to_string(),
+impl fmt::Display for LiteralKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LiteralKind::Number(n) => write!(f, "{}", n),
+            LiteralKind::String(s) => write!(f, "{}", s),
+            LiteralKind::Float(fl) => write!(f, "{}", fl),
+            LiteralKind::Bool(b) => write!(f, "{}", b),
+            LiteralKind::Nil => write!(f, "Nil"),
         }
     }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Literal {
+    value: LiteralKind,
 }
 
 impl str::FromStr for Literal {
@@ -106,6 +152,14 @@ impl str::FromStr for Literal {
         Ok(Literal {
             value: LiteralKind::String(s.to_string()),
         })
+    }
+}
+
+impl From<&str> for Literal {
+    fn from(s: &str) -> Self {
+        Literal {
+            value: LiteralKind::String(s.to_string()),
+        }
     }
 }
 
@@ -133,6 +187,18 @@ impl From<i32> for Literal {
     }
 }
 
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 #[derive(Debug)]
 pub struct Token {
     pub kind: TokenKind,
@@ -154,7 +220,10 @@ impl Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {:?} {:?}", self.kind, self.lexeme, self.literal)
+        match &self.literal {
+            Some(literal) => write!(f, "{} {}", self.kind, literal),
+            None => write!(f, "{}", self.kind),
+        }
     }
 }
 
@@ -171,5 +240,18 @@ impl ToOwned for Token {
             },
             line: self.line,
         }
+    }
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        if self.kind != other.kind
+            || self.lexeme != other.lexeme
+            || self.literal != other.literal
+            || self.line != other.line
+        {
+            return false;
+        }
+        true
     }
 }

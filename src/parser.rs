@@ -18,7 +18,7 @@ impl Parser {
 }
 
 impl Parser {
-    /// Equality expression parser
+    /// equality expression parser.
     ///
     /// # Rule
     /// `equality → comparison(("!=" | "==") comparison)*;`
@@ -35,11 +35,8 @@ impl Parser {
     {
         let mut expr = self.comparison();
         while self.match_token(&vec![TokenKind::EqualEqual, TokenKind::EqualEqual]) {
-            // TODO: Always error check
             let operator = self.previous();
-
             let right = self.comparison();
-            // TODO: Check if break early is the best option
             if right.is_none() || operator.is_none() {
                 return None;
             }
@@ -53,8 +50,9 @@ impl Parser {
     }
 
     /// matches an equality operator or anything of higher precedence.
+    ///
     /// # Rule
-    /// `comparison → term((">" | ">=" | "<" | "<=") term)* ;`
+    /// `comparison → term ((">" | ">=" | "<" | "<=") term)* ;`
     pub fn comparison<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
@@ -86,7 +84,10 @@ impl Parser {
         expr
     }
 
-    /// matches addition and subtraction expression
+    /// matches addition and subtraction expression.
+    ///
+    /// # Rule
+    /// `term -> primary ("+" | "-") primary;`
     pub fn term<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
@@ -113,7 +114,10 @@ impl Parser {
         expr
     }
 
-    /// match multiplication and division expression
+    /// match multiplication and division expression.
+    ///
+    /// # Rule
+    /// `factor -> primary ("*" | "/") primary | primary;`
     pub fn factor<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
@@ -126,7 +130,7 @@ impl Parser {
 
         return match self.match_token(&vec![TokenKind::Slash, TokenKind::Star]) {
             true => {
-                let operator = &self.previous();
+                let operator = self.previous();
                 let right = self.unary();
 
                 if right.is_none() || operator.is_none() {
@@ -138,11 +142,12 @@ impl Parser {
                     right.unwrap(),
                 )))
             }
-            false => None,
+            false => expr,
         };
     }
 
-    /// matches unary expression
+    /// matches unary expression.
+    ///
     /// # Rule
     /// `unary → ("!" | "-") unary | primary;`
     pub fn unary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
@@ -166,10 +171,10 @@ impl Parser {
         return self.primary();
     }
 
-    /// matches primitive types or parenthesis matching
+    /// matches primitive types or parenthesis matching.
+    ///
     /// # Rule
     /// `primary → NUMBER | STRING | "true" | "false" | "nil" | "("expression")";`
-
     pub fn primary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
@@ -210,7 +215,7 @@ impl Parser {
             if self.consume(&TokenKind::RightParen).is_none() {
                 match self.peek() {
                     Some(token) => {
-                        self.error(token, "Expect ')' after expression.");
+                        self.error(&token, "Expect ')' after expression.");
                     }
                     None => {}
                 }
@@ -245,7 +250,7 @@ impl Parser {
     /// If so, it consumes the token and returns `Some(T)`. Otherwise, it returns `None`.
     ///
     /// NOTE: If it returns None, should be handled as an error by consumer
-    fn consume(&mut self, kind: &TokenKind) -> Option<&Token> {
+    fn consume(&mut self, kind: &TokenKind) -> Option<Token> {
         match self.check_token(kind) {
             true => self.advance(),
             false => None,
@@ -264,7 +269,7 @@ impl Parser {
     }
 
     /// return the current token and increment the count
-    fn advance(&mut self) -> Option<&Token> {
+    fn advance(&mut self) -> Option<Token> {
         if !self.is_at_end() {
             self.current += 1
         };
@@ -272,13 +277,28 @@ impl Parser {
     }
 
     /// return the current token.
-    fn peek(&self) -> Option<&Token> {
-        self.tokens.get(self.current)
+    fn peek(&self) -> Option<Token> {
+        let token = self.tokens.get(self.current);
+
+        return match token {
+            Some(t) => Some(t.to_owned()),
+            None => None,
+        };
+    }
+
+    /// return the item at index
+    fn peek_index(&self, index: usize) -> Option<Token> {
+        let token = self.tokens.get(index);
+
+        return match token {
+            Some(t) => Some(t.to_owned()),
+            None => None,
+        };
     }
 
     /// returns the most recently consumed token
-    fn previous(&mut self) -> Option<&Token> {
-        self.tokens.get(self.current - 1)
+    fn previous(&mut self) -> Option<Token> {
+        self.peek_index(self.current - 1)
     }
 
     /// returns true if there is still some token to parse
@@ -296,3 +316,182 @@ impl Parser {
 }
 
 struct ParserError {}
+
+#[cfg(test)]
+mod parser_tests {
+    use crate::ast::expr::{Binary, Unary};
+    use crate::ast::printer::AstPrinter;
+    use crate::parser::{Literal, Parser};
+    use crate::token;
+    use crate::token::{Token, TokenKind};
+
+    #[test]
+    fn is_at_end_with_empty_tokens() {
+        let parser = Parser::from_tokens(vec![]);
+
+        assert!(parser.is_at_end());
+    }
+
+    #[test]
+    fn confirms_existence_of_token() {
+        let tokens = vec![
+            Token::new(TokenKind::Minus, "-", None, 1),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Token::new(TokenKind::Slash, "/", None, 1),
+            Token::new(TokenKind::Star, "*", None, 1),
+        ];
+
+        let mut parser = Parser::from_tokens(tokens);
+        assert!(parser.match_token(&vec![
+            TokenKind::Minus,
+            TokenKind::Plus,
+            TokenKind::Slash,
+            TokenKind::Plus
+        ]))
+    }
+
+    #[test]
+    fn parse_simple_expression() {
+        // !false
+        let tokens = vec![
+            Token::new(TokenKind::Bang, "!", None, 1),
+            Token::new(
+                TokenKind::False,
+                "false",
+                Some(token::Literal::from(false)),
+                1,
+            ),
+        ];
+
+        let mut parser = Parser::from_tokens(tokens);
+        let expr = parser.unary::<String, AstPrinter>();
+
+        assert!(expr.is_some());
+
+        let expected = Unary::new(
+            Token::new(TokenKind::Bang, "!", None, 1),
+            Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                false,
+            ))),
+        );
+
+        assert_eq!(expr.unwrap().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn parse_complex_expression() {
+        // 10 == 10
+        let tokens = vec![
+            Token::new(TokenKind::Number, "10", Some(token::Literal::from(10)), 1),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Token::new(TokenKind::Number, "10", Some(token::Literal::from(10)), 1),
+        ];
+
+        let mut parser = Parser::from_tokens(tokens);
+        let expr = parser.expression::<String, AstPrinter>();
+
+        assert!(expr.is_some());
+
+        let expected = Binary::new(
+            Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(10))),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(10))),
+        );
+
+        assert_eq!(expr.unwrap().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn parse_advance_expression() {
+        // a == b == c == d == e
+        let tokens = vec![
+            Token::new(TokenKind::String, "a", Some(token::Literal::from("a")), 1),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Token::new(TokenKind::String, "b", Some(token::Literal::from("b")), 1),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Token::new(TokenKind::String, "c", Some(token::Literal::from("c")), 1),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Token::new(TokenKind::String, "d", Some(token::Literal::from("d")), 1),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Token::new(TokenKind::String, "e", Some(token::Literal::from("e")), 1),
+        ];
+
+        let mut parser = Parser::from_tokens(tokens);
+        let expr = parser.expression::<String, AstPrinter>();
+
+        assert!(expr.is_some());
+
+        let expected = Binary::new(
+            Box::new(Binary::new(
+                Box::new(Binary::new(
+                    Box::new(Binary::new(
+                        Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                            "a",
+                        ))),
+                        Token::new(TokenKind::EqualEqual, "==", None, 1),
+                        Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                            "b",
+                        ))),
+                    )),
+                    Token::new(TokenKind::EqualEqual, "==", None, 1),
+                    Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                        "c",
+                    ))),
+                )),
+                Token::new(TokenKind::EqualEqual, "==", None, 1),
+                Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                    "d",
+                ))),
+            )),
+            Token::new(TokenKind::EqualEqual, "==", None, 1),
+            Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                "e",
+            ))),
+        );
+
+        assert_eq!(expr.unwrap().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn parse_extreme_expression() {
+        // (a + b) * (10 / 2)
+        let tokens = vec![
+            Token::new(TokenKind::LeftParen, "(", None, 1),
+            Token::new(TokenKind::String, "a", Some(token::Literal::from("a")), 1),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Token::new(TokenKind::String, "b", Some(token::Literal::from("b")), 1),
+            Token::new(TokenKind::RightParen, ")", None, 1),
+            Token::new(TokenKind::Star, "*", None, 1),
+            Token::new(TokenKind::LeftParen, "(", None, 1),
+            Token::new(TokenKind::Number, "10", Some(token::Literal::from(10)), 1),
+            Token::new(TokenKind::Slash, "/", None, 1),
+            Token::new(TokenKind::Number, "2", Some(token::Literal::from(2)), 1),
+            Token::new(TokenKind::RightParen, ")", None, 1),
+        ];
+
+        let mut parser = Parser::from_tokens(tokens);
+        let expr = parser.expression::<String, AstPrinter>();
+
+        assert!(expr.is_some());
+
+        let expected = Binary::new(
+            Box::new(Binary::<String, AstPrinter>::new(
+                Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                    "a",
+                ))),
+                Token::new(TokenKind::Plus, "+", None, 1),
+                Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
+                    "b",
+                ))),
+            )),
+            Token::new(TokenKind::Star, "*", None, 1),
+            Box::new(Binary::<String, AstPrinter>::new(
+                Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(10))),
+                Token::new(TokenKind::Slash, "/", None, 1),
+                Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(2))),
+            )),
+        );
+
+        assert_eq!(expr.unwrap().to_string(), expected.to_string());
+    }
+}

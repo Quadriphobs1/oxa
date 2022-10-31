@@ -142,7 +142,7 @@ impl fmt::Display for LiteralKind {
 
 #[derive(Clone, Debug, Default)]
 pub struct Literal {
-    value: LiteralKind,
+    pub value: LiteralKind,
 }
 
 impl str::FromStr for Literal {

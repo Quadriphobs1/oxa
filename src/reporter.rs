@@ -16,6 +16,10 @@ impl Reporter {
             println!("{} at '{}' {}", token.line, token.lexeme, message);
         }
     }
+
+    pub fn arithmetic_error(ops: &str) {
+        println!("cannot perform arithmetic operation: {}", ops);
+    }
 }
 
 fn report_error(line: usize, location: &str, message: &str) {

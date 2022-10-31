@@ -227,10 +227,8 @@ impl fmt::Display for Token {
     }
 }
 
-impl ToOwned for Token {
-    type Owned = Self;
-
-    fn to_owned(&self) -> Self::Owned {
+impl Clone for Token {
+    fn clone(&self) -> Self {
         Token {
             kind: self.kind.clone(),
             lexeme: String::from(&self.lexeme),

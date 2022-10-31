@@ -18,6 +18,21 @@ impl Parser {
 }
 
 impl Parser {
+    /// Parses tokens in a top down approach to find the appropriate expression, some expression take
+    /// more priority then other and eventually every expression boil down to primitives
+    pub fn parse<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    where
+        V: Visitor<T>,
+    {
+        match self.expression() {
+            Some(e) => Some(e),
+            None => {
+                Reporter::line_error(self.current, "Parser error");
+                None
+            }
+        }
+    }
+
     /// equality expression parser.
     ///
     /// # Rule
@@ -42,7 +57,7 @@ impl Parser {
             }
             expr = Some(Box::new(Binary::new(
                 expr.unwrap(),
-                operator.unwrap().to_owned(),
+                operator.unwrap().clone(),
                 right.unwrap(),
             )));
         }
@@ -77,7 +92,7 @@ impl Parser {
             }
             expr = Some(Box::new(Binary::new(
                 expr.unwrap(),
-                operator.unwrap().to_owned(),
+                operator.unwrap().clone(),
                 right.unwrap(),
             )));
         }
@@ -107,7 +122,7 @@ impl Parser {
             }
             expr = Some(Box::new(Binary::new(
                 expr.unwrap(),
-                operator.unwrap().to_owned(),
+                operator.unwrap().clone(),
                 right.unwrap(),
             )))
         }
@@ -138,7 +153,7 @@ impl Parser {
                 }
                 Some(Box::new(Binary::new(
                     expr.unwrap(),
-                    operator.unwrap().to_owned(),
+                    operator.unwrap().clone(),
                     right.unwrap(),
                 )))
             }
@@ -163,7 +178,7 @@ impl Parser {
             }
 
             return Some(Box::new(Unary::new(
-                operator.unwrap().to_owned(),
+                operator.unwrap().clone(),
                 right.unwrap(),
             )));
         }
@@ -196,7 +211,7 @@ impl Parser {
             return match self.previous() {
                 Some(t) => {
                     if let Some(l) = &t.literal {
-                        return Some(Box::new(Literal::new(l.to_owned())));
+                        return Some(Box::new(Literal::new(l.clone())));
                     }
 
                     None
@@ -226,6 +241,9 @@ impl Parser {
             return Some(Box::new(group));
         }
 
+        if let Some(t) = self.peek() {
+            self.error(&t, "Expect expression.");
+        }
         return None;
     }
 }
@@ -281,7 +299,7 @@ impl Parser {
         let token = self.tokens.get(self.current);
 
         return match token {
-            Some(t) => Some(t.to_owned()),
+            Some(t) => Some(t.clone()),
             None => None,
         };
     }
@@ -291,7 +309,7 @@ impl Parser {
         let token = self.tokens.get(index);
 
         return match token {
-            Some(t) => Some(t.to_owned()),
+            Some(t) => Some(t.clone()),
             None => None,
         };
     }
@@ -306,6 +324,41 @@ impl Parser {
         match self.peek() {
             Some(token) => token.kind == TokenKind::Eof,
             None => true,
+        }
+    }
+
+    /// discards tokens until we find a statement boundary
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if let Some(p) = self.previous() {
+                if p.kind == TokenKind::SemiColon {
+                    return;
+                }
+            }
+
+            let current = self.peek();
+
+            if current.is_none() {
+                return;
+            }
+
+            match current.unwrap().kind {
+                TokenKind::Class
+                | TokenKind::Fun
+                | TokenKind::Var
+                | TokenKind::For
+                | TokenKind::If
+                | TokenKind::While
+                | TokenKind::Print
+                | TokenKind::Return => {
+                    return;
+                }
+                _ => {}
+            }
+
+            self.advance();
         }
     }
 

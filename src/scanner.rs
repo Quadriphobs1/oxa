@@ -2,13 +2,13 @@ use crate::error::ErrorCode;
 use crate::reporter::Reporter;
 use crate::token::{Literal, Token, TokenKind, KEYWORDS};
 
-use std::{collections::LinkedList, str::FromStr};
+use std::str::FromStr;
 
 /// A code scanner using lexical grammar to tokens
 #[derive(Debug, Default)]
 pub struct Scanner {
     source: String,
-    tokens: LinkedList<Token>,
+    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
@@ -36,7 +36,7 @@ impl Scanner {
 
 /// Public method implementation
 impl Scanner {
-    pub fn scan_tokens(&mut self) -> Result<&LinkedList<Token>, ErrorCode> {
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token>, ErrorCode> {
         log::info!("Converting source to token");
         while !self.is_at_end() {
             // Start from the beginning of the next lexeme
@@ -45,8 +45,8 @@ impl Scanner {
         }
 
         self.tokens
-            .push_back(Token::new(TokenKind::Eof, "", None, self.line));
-        Ok(&self.tokens)
+            .push(Token::new(TokenKind::Eof, "", None, self.line));
+        Ok(self.tokens.clone())
     }
 }
 
@@ -326,7 +326,7 @@ impl Scanner {
 
         let token = Token::new(kind, lexeme, literal, self.line);
 
-        self.tokens.push_back(token);
+        self.tokens.push(token);
     }
 
     fn is_at_end(&self) -> bool {

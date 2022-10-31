@@ -86,8 +86,9 @@ impl GenerateAst {
         let file = File::create(&file_path)?;
         let mut writer = LineWriter::new(file);
 
-        writer.write_all(b"use std::marker;\n")?;
         writer.write_all(b"use crate::token;")?;
+        writer.write_all(b"use std::fmt::{Display, Formatter, Result};\n")?;
+        writer.write_all(b"use std::marker;\n")?;
         writer.write_all(b"\n\n")?;
 
         // Expr
@@ -106,7 +107,9 @@ impl GenerateAst {
     }
 
     fn define_trait(&self, writer: &mut LineWriter<File>, base_name: &str) -> Result<()> {
-        writer.write_all(format!("pub trait {}<T, V: Visitor<T>> {{", base_name).as_bytes())?;
+        writer.write_all(
+            format!("pub trait {}<T, V: Visitor<T>>: Display {{", base_name).as_bytes(),
+        )?;
         writer.write_all(b"\n")?;
         writer.write_all(b"\tfn accept(&self, visitor: &V) -> T;")?;
         writer.write_all(b"\n")?;
@@ -166,6 +169,7 @@ impl GenerateAst {
         struct_name: &str,
         struct_fields: &Vec<(&str, &str)>,
     ) -> Result<()> {
+        // struct definition
         writer.write_all(format!("pub struct {}<T, V: ?Sized> {{", struct_name).as_bytes())?;
         writer.write_all(b"\n")?;
 
@@ -183,6 +187,7 @@ impl GenerateAst {
 
         writer.write_all(b"\n\n")?;
 
+        // struct constructor
         writer.write_all(format!("impl<T, V> {struct_name}<T, V> {{").as_bytes())?;
         writer.write_all(b"\n")?;
         // Pass arguments to constructor
@@ -211,6 +216,8 @@ impl GenerateAst {
         writer.write_all(b"}")?;
 
         writer.write_all(b"\n\n")?;
+
+        // struct trait impl
         writer.write_all(
             format!(
                 "impl<T, V: Visitor<T>> {}<T, V> for {}<T, V> {{",
@@ -234,6 +241,39 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
+        writer.write_all(b"\n\n")?;
+
+        // struct display trait impl
+        writer.write_all(
+            format!(
+                "impl<T, V: Visitor<T>> Display for {}<T, V> {{",
+                struct_name
+            )
+            .as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"\tfn fmt(&self, f: &mut Formatter<'_>) -> Result {")?;
+        writer.write_all(b"\n")?;
+
+        // write!(f, "{} {} {}", self.left, self.operator, self.right)
+        let inner_brace: String = struct_fields
+            .iter()
+            .map(|_| "{}".to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let field_ref: String = struct_fields
+            .iter()
+            .map(|(a, _)| format!("self.{}", a))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        writer
+            .write_all(format!("\t\twrite!(f, \"{}\", {})", inner_brace, field_ref,).as_bytes())?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"\t}")?;
+
+        writer.write_all(b"\n")?;
+        writer.write_all(b"}")?;
         writer.write_all(b"\n\n")?;
         Ok(())
     }

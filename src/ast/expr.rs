@@ -131,6 +131,6 @@ impl<T, V: Visitor<T>> Expr<T, V> for Unary<T, V> {
 
 impl<T, V: Visitor<T>> Display for Unary<T, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}{}", self.operator, self.right)
+        write!(f, "{} {}", self.operator, self.right)
     }
 }

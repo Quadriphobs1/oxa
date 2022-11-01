@@ -26,11 +26,11 @@ impl Visitor<Object> for Interpreter {
     }
 
     fn visit_grouping_expr(&self, expr: &Grouping<Object, Self>) -> Object {
-        return self.evaluate(expr);
+        self.evaluate(expr)
     }
 
     fn visit_literal_expr(&self, expr: &Literal<Object, Self>) -> Object {
-        return expr.value.clone().into();
+        expr.value.clone().into()
     }
 
     fn visit_unary_expr(&self, expr: &Unary<Object, Self>) -> Object {

@@ -12,8 +12,11 @@ type InnerExprType<T, V> = Box<dyn Expr<T, V>>;
 
 // Constructor
 impl Parser {
-    pub fn from_tokens(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0 }
+    pub fn from_tokens(tokens: &[Token]) -> Self {
+        Parser {
+            tokens: Vec::from(tokens),
+            current: 0,
+        }
     }
 }
 
@@ -41,7 +44,7 @@ impl Parser {
     where
         V: Visitor<T>,
     {
-        return self.equality();
+        self.equality()
     }
 
     fn equality<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
@@ -49,7 +52,7 @@ impl Parser {
         V: Visitor<T>,
     {
         let mut expr = self.comparison();
-        while self.match_token(&vec![TokenKind::EqualEqual, TokenKind::EqualEqual]) {
+        while self.match_token(&[TokenKind::EqualEqual, TokenKind::EqualEqual]) {
             let operator = self.previous();
             let right = self.comparison();
             if right.is_none() || operator.is_none() {
@@ -74,11 +77,9 @@ impl Parser {
     {
         let mut expr = self.term();
 
-        if expr.is_none() {
-            return None;
-        }
+        expr.as_ref()?;
 
-        while self.match_token(&vec![
+        while self.match_token(&[
             TokenKind::Greater,
             TokenKind::GreaterEqual,
             TokenKind::Less,
@@ -109,11 +110,9 @@ impl Parser {
     {
         let mut expr = self.factor();
 
-        if expr.is_none() {
-            return None;
-        }
+        expr.as_ref()?;
 
-        while self.match_token(&vec![TokenKind::Minus, TokenKind::Plus]) {
+        while self.match_token(&[TokenKind::Minus, TokenKind::Plus]) {
             let operator = self.previous();
             let right = self.factor();
             // TODO: Check if break early is the best option
@@ -122,7 +121,7 @@ impl Parser {
             }
             expr = Some(Box::new(Binary::new(
                 expr.unwrap(),
-                operator.unwrap().clone(),
+                operator.unwrap(),
                 right.unwrap(),
             )))
         }
@@ -139,11 +138,9 @@ impl Parser {
     {
         let expr = self.unary();
 
-        if expr.is_none() {
-            return None;
-        }
+        expr.as_ref()?;
 
-        return match self.match_token(&vec![TokenKind::Slash, TokenKind::Star]) {
+        match self.match_token(&[TokenKind::Slash, TokenKind::Star]) {
             true => {
                 let operator = self.previous();
                 let right = self.unary();
@@ -153,12 +150,12 @@ impl Parser {
                 }
                 Some(Box::new(Binary::new(
                     expr.unwrap(),
-                    operator.unwrap().clone(),
+                    operator.unwrap(),
                     right.unwrap(),
                 )))
             }
             false => expr,
-        };
+        }
     }
 
     /// matches unary expression.
@@ -169,7 +166,7 @@ impl Parser {
     where
         V: Visitor<T>,
     {
-        if self.match_token(&vec![TokenKind::Bang, TokenKind::Minus]) {
+        if self.match_token(&[TokenKind::Bang, TokenKind::Minus]) {
             let operator = self.previous();
             let right = self.unary();
 
@@ -177,13 +174,10 @@ impl Parser {
                 return None;
             }
 
-            return Some(Box::new(Unary::new(
-                operator.unwrap().clone(),
-                right.unwrap(),
-            )));
+            return Some(Box::new(Unary::new(operator.unwrap(), right.unwrap())));
         }
 
-        return self.primary();
+        self.primary()
     }
 
     /// matches primitive types or parenthesis matching.
@@ -194,19 +188,19 @@ impl Parser {
     where
         V: Visitor<T>,
     {
-        if self.match_token(&vec![TokenKind::False]) {
+        if self.match_token(&[TokenKind::False]) {
             return Some(Box::new(Literal::new(token::Literal::from(false))));
         }
 
-        if self.match_token(&vec![TokenKind::True]) {
+        if self.match_token(&[TokenKind::True]) {
             return Some(Box::new(Literal::new(token::Literal::from(true))));
         }
 
-        if self.match_token(&vec![TokenKind::Nil]) {
+        if self.match_token(&[TokenKind::Nil]) {
             return Some(Box::new(Literal::new(token::Literal::default())));
         }
 
-        if self.match_token(&vec![TokenKind::Number, TokenKind::String]) {
+        if self.match_token(&[TokenKind::Number, TokenKind::String]) {
             // TODO: Differentiate the number types
             return match self.previous() {
                 Some(t) => {
@@ -220,19 +214,14 @@ impl Parser {
             };
         }
 
-        if self.match_token(&vec![TokenKind::LeftParen]) {
+        if self.match_token(&[TokenKind::LeftParen]) {
             let inner_expr = self.expression();
 
-            if let None = inner_expr {
-                return None;
-            }
+            inner_expr.as_ref()?;
 
             if self.consume(&TokenKind::RightParen).is_none() {
-                match self.peek() {
-                    Some(token) => {
-                        self.error(&token, "Expect ')' after expression.");
-                    }
-                    None => {}
+                if let Some(token) = self.peek() {
+                    self.error(&token, "Expect ')' after expression.");
                 }
             }
 
@@ -244,11 +233,11 @@ impl Parser {
         if let Some(t) = self.peek() {
             self.error(&t, "Expect expression.");
         }
-        return None;
+        None
     }
 }
 
-// Private Methods
+/// Private Methods
 impl Parser {
     /// Checks to see if the current token has any of the given types.
     /// If so, it consumes the token and returns true. Otherwise,
@@ -261,7 +250,7 @@ impl Parser {
             }
         }
 
-        return false;
+        false
     }
 
     /// Checks if the current token is of the the given kind.
@@ -291,27 +280,17 @@ impl Parser {
         if !self.is_at_end() {
             self.current += 1
         };
-        return self.previous();
+        self.previous()
     }
 
     /// return the current token.
     fn peek(&self) -> Option<Token> {
-        let token = self.tokens.get(self.current);
-
-        return match token {
-            Some(t) => Some(t.clone()),
-            None => None,
-        };
+        self.tokens.get(self.current).cloned()
     }
 
     /// return the item at index
     fn peek_index(&self, index: usize) -> Option<Token> {
-        let token = self.tokens.get(index);
-
-        return match token {
-            Some(t) => Some(t.clone()),
-            None => None,
-        };
+        self.tokens.get(index).cloned()
     }
 
     /// returns the most recently consumed token
@@ -328,7 +307,7 @@ impl Parser {
     }
 
     /// discards tokens until we find a statement boundary
-    fn synchronize(&mut self) {
+    fn _synchronize(&mut self) {
         self.advance();
 
         while !self.is_at_end() {
@@ -364,7 +343,7 @@ impl Parser {
 
     fn error(&self, token: &Token, message: &str) -> ParserError {
         Reporter::token_error(token, message);
-        return ParserError {};
+        ParserError {}
     }
 }
 
@@ -380,22 +359,22 @@ mod parser_tests {
 
     #[test]
     fn is_at_end_with_empty_tokens() {
-        let parser = Parser::from_tokens(vec![]);
+        let parser = Parser::from_tokens(&[]);
 
         assert!(parser.is_at_end());
     }
 
     #[test]
     fn confirms_existence_of_token() {
-        let tokens = vec![
+        let tokens = [
             Token::new(TokenKind::Minus, "-", None, 1),
             Token::new(TokenKind::Plus, "+", None, 1),
             Token::new(TokenKind::Slash, "/", None, 1),
             Token::new(TokenKind::Star, "*", None, 1),
         ];
 
-        let mut parser = Parser::from_tokens(tokens);
-        assert!(parser.match_token(&vec![
+        let mut parser = Parser::from_tokens(&tokens);
+        assert!(parser.match_token(&[
             TokenKind::Minus,
             TokenKind::Plus,
             TokenKind::Slash,
@@ -406,7 +385,7 @@ mod parser_tests {
     #[test]
     fn parse_simple_expression() {
         // !false
-        let tokens = vec![
+        let tokens = [
             Token::new(TokenKind::Bang, "!", None, 1),
             Token::new(
                 TokenKind::False,
@@ -416,7 +395,7 @@ mod parser_tests {
             ),
         ];
 
-        let mut parser = Parser::from_tokens(tokens);
+        let mut parser = Parser::from_tokens(&tokens);
         let expr = parser.unary::<String, AstPrinter>();
 
         assert!(expr.is_some());
@@ -434,13 +413,13 @@ mod parser_tests {
     #[test]
     fn parse_complex_expression() {
         // 10 == 10
-        let tokens = vec![
+        let tokens = [
             Token::new(TokenKind::Number, "10", Some(token::Literal::from(10)), 1),
             Token::new(TokenKind::EqualEqual, "==", None, 1),
             Token::new(TokenKind::Number, "10", Some(token::Literal::from(10)), 1),
         ];
 
-        let mut parser = Parser::from_tokens(tokens);
+        let mut parser = Parser::from_tokens(&tokens);
         let expr = parser.expression::<String, AstPrinter>();
 
         assert!(expr.is_some());
@@ -457,7 +436,7 @@ mod parser_tests {
     #[test]
     fn parse_advance_expression() {
         // a == b == c == d == e
-        let tokens = vec![
+        let tokens = [
             Token::new(TokenKind::String, "a", Some(token::Literal::from("a")), 1),
             Token::new(TokenKind::EqualEqual, "==", None, 1),
             Token::new(TokenKind::String, "b", Some(token::Literal::from("b")), 1),
@@ -469,7 +448,7 @@ mod parser_tests {
             Token::new(TokenKind::String, "e", Some(token::Literal::from("e")), 1),
         ];
 
-        let mut parser = Parser::from_tokens(tokens);
+        let mut parser = Parser::from_tokens(&tokens);
         let expr = parser.expression::<String, AstPrinter>();
 
         assert!(expr.is_some());
@@ -508,7 +487,7 @@ mod parser_tests {
     #[test]
     fn parse_extreme_expression() {
         // (a + b) * (10 / 2)
-        let tokens = vec![
+        let tokens = [
             Token::new(TokenKind::LeftParen, "(", None, 1),
             Token::new(TokenKind::String, "a", Some(token::Literal::from("a")), 1),
             Token::new(TokenKind::Plus, "+", None, 1),
@@ -522,7 +501,7 @@ mod parser_tests {
             Token::new(TokenKind::RightParen, ")", None, 1),
         ];
 
-        let mut parser = Parser::from_tokens(tokens);
+        let mut parser = Parser::from_tokens(&tokens);
         let expr = parser.expression::<String, AstPrinter>();
 
         assert!(expr.is_some());

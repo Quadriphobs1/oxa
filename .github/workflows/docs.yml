@@ -1,0 +1,21 @@
+on: [ push ]
+name: cargo docs
+
+jobs:
+
+  doc_tests:
+    name: doc tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+
+      - name: Run doctest
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --doc

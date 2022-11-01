@@ -15,10 +15,10 @@ pub enum ErrorCode {
 impl ErrorCode {
     pub fn get_return_code(&self) -> i32 {
         match &self {
-            ErrorCode::InvalidTokenKey(_) => 2,
-            ErrorCode::FileError(_) => 10,
-            ErrorCode::IO(_) => 11,
-            ErrorCode::ProcessError => 65,
+            Self::InvalidTokenKey(_) => 2,
+            Self::FileError(_) => 10,
+            Self::IO(_) => 11,
+            Self::ProcessError => 65,
             _ => 1, // Everything != 0 will be treated as an error
         }
     }
@@ -28,7 +28,11 @@ impl fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
             // TODO: Update displayed error message for each error message kind
-            _ => write!(f, "{:?}", self), // for any variant not covered
+            Self::FileError(e) => write!(f, "file processing error: {:?}", e),
+            Self::IO(e) => write!(f, "io error: {:?}", e),
+            Self::ProcessError => write!(f, "process error"),
+            Self::InvalidTokenKey(t) => write!(f, "invalid token: {}", t),
+            Self::Unknown => write!(f, "unknown error"),
         }
     }
 }
@@ -42,10 +46,6 @@ impl From<Error> for ErrorCode {
 impl PartialEq for ErrorCode {
     fn eq(&self, other: &Self) -> bool {
         self == other
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        self != other
     }
 }
 

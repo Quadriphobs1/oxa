@@ -4,25 +4,29 @@ pub struct AstPrinter {}
 
 impl Visitor<String> for AstPrinter {
     fn visit_binary_expr(&self, expr: &Binary<String, Self>) -> String {
-        return parenthesize(self, &expr.operator.lexeme, &vec![&expr.left, &expr.right]);
+        parenthesize(
+            self,
+            &expr.operator.lexeme,
+            &[expr.left.as_ref(), expr.right.as_ref()],
+        )
     }
 
     fn visit_grouping_expr(&self, expr: &Grouping<String, Self>) -> String {
-        return parenthesize(self, "group", &vec![&expr.expression]);
+        parenthesize(self, "group", &[expr.expression.as_ref()])
     }
 
     fn visit_literal_expr(&self, expr: &Literal<String, Self>) -> String {
-        return expr.value.to_string();
+        expr.value.to_string()
     }
 
     fn visit_unary_expr(&self, expr: &Unary<String, Self>) -> String {
-        return parenthesize(self, &expr.operator.lexeme, &vec![&expr.right]);
+        parenthesize(self, &expr.operator.lexeme, &[expr.right.as_ref()])
     }
 }
 
 impl AstPrinter {
     pub fn print(&self, expr: Box<dyn Expr<String, Self>>) -> String {
-        return expr.accept(self);
+        expr.accept(self)
     }
 }
 
@@ -42,14 +46,14 @@ impl AstPrinter {
 ///     Box::new(Literal::new(token::Literal::from(2)))
 /// );
 /// let printer = AstPrinter {};
-/// let value = parenthesize(&printer, &expr.operator.lexeme, &vec![&expr.right]);
+/// let value = parenthesize(&printer, &expr.operator.lexeme, &[expr.right.as_ref()]);
 ///
 /// assert_eq!(&value, "(+ 2)");
 /// ```
 pub fn parenthesize<V: Visitor<String>>(
     visitor: &V,
     name: &str,
-    exprs: &Vec<&Box<dyn Expr<String, V>>>,
+    exprs: &[&dyn Expr<String, V>],
 ) -> String {
     let mut string = String::new();
 
@@ -86,7 +90,7 @@ mod parenthesize_tests {
         let value = parenthesize(
             &printer,
             &expr.operator.lexeme,
-            &vec![&expr.left, &expr.right],
+            &[expr.left.as_ref(), expr.right.as_ref()],
         );
 
         assert_eq!(&value, "(+ 1 2)");

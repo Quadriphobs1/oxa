@@ -46,7 +46,7 @@ impl AstPrinter {
 ///     Box::new(Literal::new(token::Literal::from(2)))
 /// );
 /// let printer = AstPrinter {};
-/// let value = parenthesize(&printer, &expr.operator.lexeme, &vec![&expr.right]);
+/// let value = parenthesize(&printer, &expr.operator.lexeme, &[expr.right.as_ref()]);
 ///
 /// assert_eq!(&value, "(+ 2)");
 /// ```

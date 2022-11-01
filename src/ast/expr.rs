@@ -39,7 +39,7 @@ impl<T, V> Binary<T, V> {
 
 impl<T, V: Visitor<T>> Expr<T, V> for Binary<T, V> {
     fn accept(&self, visitor: &V) -> T {
-        return visitor.visit_binary_expr(self);
+        visitor.visit_binary_expr(self)
     }
 }
 
@@ -67,7 +67,7 @@ impl<T, V> Grouping<T, V> {
 
 impl<T, V: Visitor<T>> Expr<T, V> for Grouping<T, V> {
     fn accept(&self, visitor: &V) -> T {
-        return visitor.visit_grouping_expr(self);
+        visitor.visit_grouping_expr(self)
     }
 }
 
@@ -95,7 +95,7 @@ impl<T, V> Literal<T, V> {
 
 impl<T, V: Visitor<T>> Expr<T, V> for Literal<T, V> {
     fn accept(&self, visitor: &V) -> T {
-        return visitor.visit_literal_expr(self);
+        visitor.visit_literal_expr(self)
     }
 }
 
@@ -125,7 +125,7 @@ impl<T, V> Unary<T, V> {
 
 impl<T, V: Visitor<T>> Expr<T, V> for Unary<T, V> {
     fn accept(&self, visitor: &V) -> T {
-        return visitor.visit_unary_expr(self);
+        visitor.visit_unary_expr(self)
     }
 }
 

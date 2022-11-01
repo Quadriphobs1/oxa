@@ -57,17 +57,12 @@ pub fn run(s: &str) -> Result<(), ErrorCode> {
 
     let tokens = scanner.scan_tokens()?;
 
-    let mut parser = Parser::from_tokens(tokens);
+    let mut parser = Parser::from_tokens(&tokens);
     let expression = parser.parse::<String, AstPrinter>();
 
-    match expression {
-        Some(e) => {
-            let printer = AstPrinter {};
-            println!("{}", printer.print(e));
-        }
-        None => {
-            // Stop if there was a syntax error.
-        }
+    if let Some(e) = expression {
+        let printer = AstPrinter {};
+        println!("{}", printer.print(e));
     }
 
     Ok(())

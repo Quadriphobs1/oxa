@@ -21,7 +21,7 @@ pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "while" => TokenKind::While,
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenKind {
     // Single-character tokens.
     LeftParen,
@@ -232,10 +232,7 @@ impl Clone for Token {
         Token {
             kind: self.kind.clone(),
             lexeme: String::from(&self.lexeme),
-            literal: match &self.literal {
-                Some(l) => Some(l.clone()),
-                None => None,
-            },
+            literal: self.literal.as_ref().cloned(),
             line: self.line,
         }
     }

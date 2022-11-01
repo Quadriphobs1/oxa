@@ -230,7 +230,7 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
         writer.write_all(
             format!(
-                "\t\treturn visitor.visit_{}_{}(self);",
+                "\t\\visitor.visit_{}_{}(self)",
                 struct_name.to_lowercase(),
                 base_name.to_lowercase()
             )

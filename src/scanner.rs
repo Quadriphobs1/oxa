@@ -118,7 +118,7 @@ impl Scanner {
             }
         }
 
-        return true;
+        true
     }
 
     fn process_comment_char_token(&mut self, c: char) -> bool {
@@ -137,15 +137,14 @@ impl Scanner {
                         }
                     }
                 }
-                return true;
+                true
             }
             false => false,
         }
     }
 
     fn process_string_token(&mut self, c: char) -> bool {
-        let string: &str;
-        match c {
+        let string: &str = match c {
             '"' => {
                 while !self.is_at_end() {
                     if let Some(p) = self.peek(0) {
@@ -167,7 +166,7 @@ impl Scanner {
                 self.advance();
 
                 // Trim the surrounding quotes.
-                string = &self.source[self.start + 1..self.current - 1];
+                &self.source[self.start + 1..self.current - 1]
             }
             '\'' => {
                 while !self.is_at_end() {
@@ -190,14 +189,14 @@ impl Scanner {
                 self.advance();
 
                 // Trim the surrounding quotes.
-                string = &self.source[self.start + 1..self.current - 1];
+                &self.source[self.start + 1..self.current - 1]
             }
             _ => {
                 return false;
             }
         };
 
-        return match Literal::from_str(string) {
+        match Literal::from_str(string) {
             Ok(l) => {
                 self.add_token(TokenKind::String, Some(l));
                 true
@@ -206,7 +205,7 @@ impl Scanner {
                 log::warn!("Unable to convert string to process string");
                 false
             }
-        };
+        }
     }
 
     fn process_number_token(&mut self, c: char) -> bool {
@@ -223,30 +222,27 @@ impl Scanner {
 
                 // Look for a fractional part.
                 if let Some(v) = self.peek(0) {
-                    match v {
-                        '.' => {
-                            let next = self.peek(1);
-                            if next.is_some() && is_digit(next.unwrap()) {
-                                // Consume the "."
-                                self.advance();
+                    if v == '.' {
+                        let next = self.peek(1);
+                        if next.is_some() && is_digit(next.unwrap()) {
+                            // Consume the "."
+                            self.advance();
 
-                                'fractional_number: loop {
-                                    let current = self.peek(0);
-                                    if current.is_some() && is_digit(current.unwrap()) {
-                                        self.advance();
-                                    } else {
-                                        break 'fractional_number;
-                                    }
+                            'fractional_number: loop {
+                                let current = self.peek(0);
+                                if current.is_some() && is_digit(current.unwrap()) {
+                                    self.advance();
+                                } else {
+                                    break 'fractional_number;
                                 }
                             }
                         }
-                        _ => {}
                     }
                 }
 
                 // TODO: Parse string to double or number
                 let number = &self.source[self.start..self.current];
-                return match Literal::from_str(number) {
+                match Literal::from_str(number) {
                     Ok(l) => {
                         self.add_token(TokenKind::Number, Some(l));
                         true
@@ -255,7 +251,7 @@ impl Scanner {
                         log::warn!("Unable to convert string to number");
                         false
                     }
-                };
+                }
             }
             _ => false,
         }
@@ -280,7 +276,7 @@ impl Scanner {
                 }
                 self.add_token(TokenKind::Identifier, None);
 
-                return true;
+                true
             }
             _ => false,
         }
@@ -304,7 +300,7 @@ impl Scanner {
             }
         }
 
-        return true;
+        true
     }
 
     fn process_ignored_char(&mut self, c: char) -> bool {
@@ -313,7 +309,7 @@ impl Scanner {
             ' ' | '\r' | '\t' => true,
             '\n' => {
                 self.line += 1;
-                return true;
+                true
             }
             _ => false,
         }
@@ -362,7 +358,7 @@ impl Scanner {
                 }
 
                 self.increment_current();
-                return true;
+                true
             }
         }
     }
@@ -373,14 +369,14 @@ impl Scanner {
 }
 
 fn is_alpha_numeric(c: char) -> bool {
-    return is_alpha(c) || is_digit(c);
+    is_alpha(c) || is_digit(c)
 }
 fn is_digit(c: char) -> bool {
-    return c >= '0' && c <= '9';
+    ('0'..='9').contains(&c)
 }
 
 fn is_alpha(c: char) -> bool {
-    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
+    ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || c == '_'
 }
 
 #[cfg(test)]
@@ -389,12 +385,12 @@ mod scanner_tests {
 
     #[test]
     fn test_no_token_with_initial_creation() {
-        let scanner = Scanner::from_source(&String::new());
+        let scanner = Scanner::from_source("");
         assert_eq!(scanner.tokens.len(), 0);
     }
     #[test]
     fn test_generates_eof_token_at_default() {
-        let mut scanner = Scanner::from_source(&String::new());
+        let mut scanner = Scanner::from_source("");
         scanner.scan_tokens().unwrap();
 
         assert_eq!(scanner.tokens.len(), 1);

@@ -5,7 +5,7 @@ use crate::reporter::Reporter;
 use std::fmt::{Display, Formatter, Result};
 use std::ops::{Add, Div, Mul, Sub};
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum ObjectKind {
     Number,
     Float,
@@ -677,37 +677,37 @@ mod object_tests {
     fn logical_same_type() {
         let obj_1 = Object::from("string");
         let obj_2 = Object::from("string");
-        assert_eq!(obj_1 == obj_2, true);
+        assert!(obj_1 == obj_2);
 
         let obj_3 = Object::from("string");
         let obj_4 = Object::from("string2");
-        assert_eq!(obj_3 != obj_4, true);
+        assert!(obj_3 != obj_4);
 
         let obj_5 = Object::from(10);
         let obj_6 = Object::from(20);
-        assert_eq!(obj_5 != obj_6, true);
+        assert!(obj_5 != obj_6);
 
         let obj_7 = Object::from(10);
         let obj_8 = Object::from(20);
-        assert_eq!(obj_7 < obj_8, true);
+        assert!(obj_7 < obj_8);
 
         let obj_9 = Object::from(10);
         let obj_10 = Object::from(20);
-        assert_eq!(obj_9 > obj_10, false);
+        assert!(obj_9 < obj_10);
 
         let obj_1 = Object::default();
         let obj_2 = Object::default();
-        assert_eq!(obj_1 == obj_2, true);
+        assert!(obj_1 == obj_2);
     }
 
     #[test]
     fn logical_wrong_type() {
         let obj_1 = Object::default();
         let obj_2 = Object::from("string");
-        assert_eq!(obj_1 == obj_2, false);
+        assert!(obj_1 != obj_2);
 
         let obj_3 = Object::from("string");
         let obj_4 = Object::from(10.5);
-        assert_eq!(obj_3 != obj_4, true);
+        assert!(obj_3 != obj_4);
     }
 }

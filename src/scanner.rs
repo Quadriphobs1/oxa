@@ -1,5 +1,4 @@
-use crate::error::ErrorCode;
-use crate::reporter::Reporter;
+use crate::errors::{reporter::Reporter, ErrorCode};
 use crate::token::{Literal, Token, TokenKind, KEYWORDS};
 
 use std::str::FromStr;
@@ -388,6 +387,7 @@ mod scanner_tests {
         let scanner = Scanner::from_source("");
         assert_eq!(scanner.tokens.len(), 0);
     }
+
     #[test]
     fn test_generates_eof_token_at_default() {
         let mut scanner = Scanner::from_source("");
@@ -401,6 +401,33 @@ mod scanner_tests {
         let mut scanner = Scanner::from_source("(");
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
+    }
+
+    #[test]
+    fn test_generates_token_for_number() {
+        let mut scanner = Scanner::from_source("1");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 2);
+        assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Number);
+    }
+
+    #[test]
+    fn test_generates_token_for_unary_number() {
+        let mut scanner = Scanner::from_source("-1");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 3);
+        assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Minus);
+        assert_eq!(scanner.tokens.get(1).unwrap().kind, TokenKind::Number);
+    }
+
+    #[test]
+    fn test_generates_token_for_expression() {
+        let mut scanner = Scanner::from_source("1 + 2");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 4);
+        assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Number);
+        assert_eq!(scanner.tokens.get(1).unwrap().kind, TokenKind::Plus);
+        assert_eq!(scanner.tokens.get(2).unwrap().kind, TokenKind::Number);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Visitor};
-use crate::reporter::Reporter;
+use crate::errors::reporter::Reporter;
+use crate::errors::ErrorCode;
 use crate::token;
 use crate::token::{Token, TokenKind};
 
@@ -23,19 +24,22 @@ impl Parser {
 impl Parser {
     /// Parses tokens in a top down approach to find the appropriate expression, some expression take
     /// more priority then other and eventually every expression boil down to primitives
-    pub fn parse<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    pub fn parse<T: 'static, V: 'static>(&mut self) -> Result<InnerExprType<T, V>, ErrorCode>
     where
         V: Visitor<T>,
     {
         match self.expression() {
-            Some(e) => Some(e),
+            Some(e) => Ok(e),
             None => {
                 Reporter::line_error(self.current, "Parser error");
-                None
+                // TODO: Is this the right error
+                Err(ErrorCode::ProcessError)
             }
         }
     }
+}
 
+impl Parser {
     /// equality expression parser.
     ///
     /// # Rule
@@ -71,7 +75,7 @@ impl Parser {
     ///
     /// # Rule
     /// `comparison → term ((">" | ">=" | "<" | "<=") term)* ;`
-    pub fn comparison<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    fn comparison<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
     {
@@ -104,7 +108,7 @@ impl Parser {
     ///
     /// # Rule
     /// `term -> primary ("+" | "-") primary;`
-    pub fn term<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    fn term<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
     {
@@ -132,7 +136,7 @@ impl Parser {
     ///
     /// # Rule
     /// `factor -> primary ("*" | "/") primary | primary;`
-    pub fn factor<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    fn factor<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
     {
@@ -162,7 +166,7 @@ impl Parser {
     ///
     /// # Rule
     /// `unary → ("!" | "-") unary | primary;`
-    pub fn unary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    fn unary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
     {
@@ -184,7 +188,7 @@ impl Parser {
     ///
     /// # Rule
     /// `primary → NUMBER | STRING | "true" | "false" | "nil" | "("expression")";`
-    pub fn primary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    fn primary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: Visitor<T>,
     {
@@ -341,13 +345,11 @@ impl Parser {
         }
     }
 
-    fn error(&self, token: &Token, message: &str) -> ParserError {
+    fn error(&self, token: &Token, message: &str) -> ErrorCode {
         Reporter::token_error(token, message);
-        ParserError {}
+        ErrorCode::ParserError(token.clone(), message.to_string())
     }
 }
-
-struct ParserError {}
 
 #[cfg(test)]
 mod parser_tests {
@@ -405,6 +407,26 @@ mod parser_tests {
             Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(
                 false,
             ))),
+        );
+
+        assert_eq!(expr.unwrap().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn parse_unary_expression() {
+        let tokens = [
+            Token::new(TokenKind::Minus, "-", None, 1),
+            Token::new(TokenKind::Number, "2", Some(token::Literal::from(2)), 1),
+        ];
+
+        let mut parser = Parser::from_tokens(&tokens);
+        let expr = parser.unary::<String, AstPrinter>();
+
+        assert!(expr.is_some());
+
+        let expected = Unary::new(
+            Token::new(TokenKind::Minus, "-", None, 1),
+            Box::new(Literal::<String, AstPrinter>::new(token::Literal::from(2))),
         );
 
         assert_eq!(expr.unwrap().to_string(), expected.to_string());

@@ -1,12 +1,14 @@
+use crate::errors::ErrorCode;
 use crate::token::{Token, TokenKind};
 use std::fmt::Debug;
 
+// TODO: All reported error should be collected somewhere to log at once
 #[derive(Debug, Default)]
 pub struct Reporter {}
 
 impl Reporter {
     pub fn line_error(line: usize, message: &str) {
-        report_error(line, "", message)
+        println!("[line {} Error : {}", line, message);
     }
 
     pub fn token_error(token: &Token, message: &str) {
@@ -20,8 +22,8 @@ impl Reporter {
     pub fn arithmetic_error(ops: &str) {
         println!("cannot perform arithmetic operation: {}", ops);
     }
-}
 
-fn report_error(line: usize, location: &str, message: &str) {
-    println!("[line {} Error {}: {}", line, location, message);
+    pub fn runtime_error(error: &ErrorCode) {
+        println!("Runtime error: {}", error);
+    }
 }

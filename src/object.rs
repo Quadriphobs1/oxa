@@ -1,7 +1,7 @@
 use crate::token::{Literal, LiteralKind};
 use std::cmp::Ordering;
 
-use crate::reporter::Reporter;
+use crate::errors::reporter::Reporter;
 use std::fmt::{Display, Formatter, Result};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -15,7 +15,7 @@ pub enum ObjectKind {
     Nil,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum ObjectValue {
     Number(i32),
     Float(f32),
@@ -49,11 +49,6 @@ impl From<Literal> for ObjectValue {
     }
 }
 
-impl Clone for ObjectValue {
-    fn clone(&self) -> Self {
-        todo!()
-    }
-}
 impl Display for ObjectValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self {
@@ -61,7 +56,7 @@ impl Display for ObjectValue {
             ObjectValue::Number(n) => write!(f, "{}", n),
             ObjectValue::String(s) => write!(f, "{}", s),
             ObjectValue::Bool(b) => write!(f, "{}", b),
-            ObjectValue::Nil => write!(f, "Nil"),
+            ObjectValue::Nil => write!(f, "nil"),
         }
     }
 }
@@ -677,15 +672,15 @@ mod object_tests {
     fn logical_same_type() {
         let obj_1 = Object::from("string");
         let obj_2 = Object::from("string");
-        assert!(obj_1 == obj_2);
+        assert_eq!(obj_1, obj_2);
 
         let obj_3 = Object::from("string");
         let obj_4 = Object::from("string2");
-        assert!(obj_3 != obj_4);
+        assert_ne!(obj_3, obj_4);
 
         let obj_5 = Object::from(10);
         let obj_6 = Object::from(20);
-        assert!(obj_5 != obj_6);
+        assert_ne!(obj_5, obj_6);
 
         let obj_7 = Object::from(10);
         let obj_8 = Object::from(20);
@@ -697,17 +692,26 @@ mod object_tests {
 
         let obj_1 = Object::default();
         let obj_2 = Object::default();
-        assert!(obj_1 == obj_2);
+        assert_eq!(obj_1, obj_2);
     }
 
     #[test]
     fn logical_wrong_type() {
         let obj_1 = Object::default();
         let obj_2 = Object::from("string");
-        assert!(obj_1 != obj_2);
+        assert_ne!(obj_1, obj_2);
 
         let obj_3 = Object::from("string");
         let obj_4 = Object::from(10.5);
-        assert!(obj_3 != obj_4);
+        assert_ne!(obj_3, obj_4);
+    }
+
+    #[test]
+    fn check_numeric_type_points() {
+        let obj_1 = Object::from(1);
+        assert_eq!(obj_1.to_string(), "1".to_string());
+
+        let obj_2 = Object::from(-1);
+        assert_eq!(obj_2.to_string(), "-1");
     }
 }

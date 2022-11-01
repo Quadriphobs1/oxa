@@ -1,31 +1,31 @@
-use crate::ast::printer::AstPrinter;
-use crate::error::ErrorCode;
+use crate::errors::ErrorCode;
+use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use std::fs;
 
 #[derive(Debug, Default)]
 pub struct Oxa {
-    error: bool,
+    // TODO: Handle error handle properly with Reporter
+    pub error: bool,
+    pub runtime_error: bool,
+    interpreter: Interpreter,
 }
 
 impl Oxa {
     pub fn new() -> Self {
-        Oxa { error: false }
+        Oxa::default()
     }
 }
 
+/// public methods
 impl Oxa {
     pub fn run_file(&mut self, file_path: &str) -> Result<(), ErrorCode> {
         log::info!("Loading file information");
         let file = fs::read_to_string(file_path);
         match file {
             Ok(result) => {
-                run(&result)?;
-                if self.error {
-                    log::error!("Error while processing file");
-                    return Err(ErrorCode::ProcessError);
-                }
+                self.run(&result)?;
                 Ok(())
             }
             Err(e) => {
@@ -40,8 +40,7 @@ impl Oxa {
         let mut input = String::new();
         match std::io::stdin().read_line(&mut input) {
             Ok(_) => {
-                run(&input)?;
-                self.error = false;
+                self.run(&input)?;
                 Ok(())
             }
             Err(e) => {
@@ -52,18 +51,19 @@ impl Oxa {
     }
 }
 
-pub fn run(s: &str) -> Result<(), ErrorCode> {
-    let mut scanner = Scanner::from_source(s);
+/// private methods
+impl Oxa {
+    fn run(&self, s: &str) -> Result<(), ErrorCode> {
+        let mut scanner = Scanner::from_source(s);
 
-    let tokens = scanner.scan_tokens()?;
+        let tokens = scanner.scan_tokens()?;
 
-    let mut parser = Parser::from_tokens(&tokens);
-    let expression = parser.parse::<String, AstPrinter>();
+        let mut parser = Parser::from_tokens(&tokens);
+        let expression = parser.parse()?;
 
-    if let Some(e) = expression {
-        let printer = AstPrinter {};
-        println!("{}", printer.print(e));
+        let result = self.interpreter.interpret(expression.as_ref())?;
+
+        println!("{}", result);
+        Ok(())
     }
-
-    Ok(())
 }

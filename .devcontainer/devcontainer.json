@@ -2,9 +2,11 @@
     "name": "oxa: codespace",
     "extensions": [
         "cschleiden.vscode-github-actions",
-        "matklad.rust-analyzer",
         "serayuzgur.crates",
-        "vadimcn.vscode-lldb"
+        "vadimcn.vscode-lldb",
+        "bungcip.better-toml",
+        "ms-azuretools.vscode-docker",
+        "rust-lang.rust-analyzer"
     ],
     "dockerFile": "Dockerfile",
     "settings": {

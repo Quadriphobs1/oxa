@@ -16,11 +16,11 @@ fn main() {
         }
         2 => {
             log::info!("Starting with a file");
-            oxa::error::exit_with_return_code(oxa.run_file(&args[1]));
+            oxa::errors::exit_with_return_code(oxa.run_file(&args[1]));
         }
         _ => {
             log::info!("Starting with prompt");
-            oxa::error::exit_with_return_code(oxa.run_prompt());
+            oxa::errors::exit_with_return_code(oxa.run_prompt());
         }
     }
 }

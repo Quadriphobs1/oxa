@@ -25,7 +25,7 @@ impl Visitor<String> for AstPrinter {
 }
 
 impl AstPrinter {
-    pub fn print(&self, expr: Box<dyn Expr<String, Self>>) -> String {
+    pub fn print(&self, expr: &dyn Expr<String, Self>) -> String {
         expr.accept(self)
     }
 }
@@ -62,7 +62,7 @@ pub fn parenthesize<V: Visitor<String>>(
 
     for expr in exprs {
         string.push(' ');
-        string.push_str(&*expr.accept(visitor));
+        string.push_str(&expr.accept(visitor));
     }
 
     string.push(')');
@@ -109,7 +109,7 @@ mod parenthesize_tests {
             ))))),
         );
         let printer = AstPrinter {};
-        let value = printer.print(Box::new(expr));
+        let value = printer.print(&expr);
         assert_eq!(&value, "(* (- 123) (group 45.67))")
     }
 }

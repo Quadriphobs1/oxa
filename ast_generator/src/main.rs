@@ -83,10 +83,10 @@ impl GenerateAst {
             return Err(Error::new(ErrorKind::InvalidInput, "path cannot be empty"));
         }
         let file_path = format!("{}/{}.rs", &dir_str.unwrap(), &base_name.to_lowercase());
-        let file = File::create(&file_path)?;
+        let file = File::create(file_path)?;
         let mut writer = LineWriter::new(file);
 
-        writer.write_all(b"use crate::token;")?;
+        writer.write_all(b"use crate::token;\n")?;
         writer.write_all(b"use std::fmt::{Display, Formatter, Result};\n")?;
         writer.write_all(b"use std::marker;\n")?;
         writer.write_all(b"\n\n")?;
@@ -156,7 +156,7 @@ impl GenerateAst {
     ) -> Result<()> {
         // The AST structs.
         for (struct_name, struct_fields) in types {
-            self.define_type(writer, base_name, struct_name, &struct_fields)?;
+            self.define_type(writer, base_name, struct_name, struct_fields)?;
         }
 
         Ok(())
@@ -192,7 +192,7 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
         // Pass arguments to constructor
         let arguments = struct_fields
-            .into_iter()
+            .iter()
             .map(|(a, b)| format!("{}: {}", a, b))
             .collect::<Vec<String>>()
             .join(", ");
@@ -230,7 +230,7 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
         writer.write_all(
             format!(
-                "\t\\visitor.visit_{}_{}(self)",
+                "\t\tvisitor.visit_{}_{}(self)",
                 struct_name.to_lowercase(),
                 base_name.to_lowercase()
             )
@@ -280,14 +280,9 @@ impl GenerateAst {
 }
 
 fn main() {
-    // Setup
-    // let args: Vec<String> = env::args().collect();
-    // if args.len() != 1 {
-    //     eprintln!("Usage: generate_ast <output directory>");
-    //     std::process::exit(64);
-    // }
+    println!("Running ast code generation function files");
 
-    const AST_DIR: &str = "./src/ast/";
+    const AST_DIR: &str = "./oxa/src/ast/";
     let path = PathBuf::from(AST_DIR);
     create_or_empty_dir(&path).unwrap();
 
@@ -315,17 +310,20 @@ fn main() {
         ),
     ];
     generator.define_ast("Expr", &expressions).unwrap();
+
+    // Generate statement ast
+    // generator.define_ast("Stmt", &statements).unwrap();
     // TODO: Use the cli rustfmt to format the file
 
-    println!("Running build function file")
+    println!("Successfully generated ast files");
 }
 
 /// Created a directory with the provided path or delete the directory if it exist and has a file
 fn create_or_empty_dir(path: &Path) -> Result<()> {
-    if read_dir(&path).is_ok() {
+    if read_dir(path).is_ok() {
         return Ok(());
     }
-    let res = create_dir_all(&path);
+    let res = create_dir_all(path);
     match &res {
         Ok(()) => {}
         Err(err) => {

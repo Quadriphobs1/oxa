@@ -1,37 +1,22 @@
-[package]
-name = "oxa"
-version = "0.0.1"
-edition = "2021"
-readme = "README.md"
-include = ["src/*.rs", "Cargo.toml"]
-license = "MIT"
-default-run = "oxa"
+[workspace]
+resolver = "2"
+members = ["ast_generator", "oxa"]
 
-[[bin]]
-name = "oxa"
-path = "src/bin/main.rs"
-doc = false
-
-[lib]
-name = "oxa"
-path = "src/lib.rs"
-test = true
-doctest = true
-doc = true
-
-build = "build.rs"
-
-buildit = "build.rs"
-
+# default to small, optimized workspace release binaries
 [profile.release]
-lto = true
 panic = "abort"
 codegen-units = 1
-debug = 0
-strip = "symbols"
-opt-level = 3
+lto = true # VERY slightly smaller wasm
+incremental = false
+# opt-level = 's' # 10-20% smaller wasm compared to `opt-level = 3`
+# opt-level = 1 # very slow and big wasm. Don't do this.
+opt-level = 2 # fast and small wasm, basically same as `opt-level = 's'`
+# opt-level = 3 # unecessarily large wasm for no performance gain
 
-[dependencies]
-env_logger = "0.9.1"
-log = "0.4.17"
-phf = { version = "0.11.1", features = ["macros"] }
+# debug = true # include debug symbols, useful when profiling wasm
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

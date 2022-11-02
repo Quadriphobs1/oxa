@@ -1,5 +1,3 @@
-#![feature(io_error_more)]
-
 use std::io::{Error, ErrorKind};
 use std::{
     fs::{create_dir_all, read_dir, File},
@@ -64,7 +62,7 @@ impl GenerateAst {
         let mut dir = read_dir(&path)?;
         if dir.next().is_none() {
             return Err(Error::new(
-                ErrorKind::NotADirectory,
+                ErrorKind::InvalidInput,
                 "directory doesn't exist",
             ));
         }

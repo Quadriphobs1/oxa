@@ -57,13 +57,12 @@ impl Oxa {
         let mut scanner = Scanner::from_source(s);
 
         let tokens = scanner.scan_tokens()?;
-
+        println!("{:?}", tokens);
         let mut parser = Parser::from_tokens(&tokens);
         let expression = parser.parse()?;
-
         let result = self.interpreter.interpret(expression.as_ref())?;
 
-        println!("{}", result);
+        println!("{:?}", result);
         Ok(())
     }
 }

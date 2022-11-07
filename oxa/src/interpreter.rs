@@ -1,4 +1,6 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Visitor};
+use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary};
+use crate::ast::stmt::{Expression, Print, Stmt};
+use crate::ast::{expr, stmt};
 use crate::errors::reporter::Reporter;
 use crate::errors::ErrorCode;
 use crate::object::{Object, ObjectKind, ObjectValue};
@@ -9,7 +11,7 @@ pub struct Interpreter();
 
 type ResultObject = Result<Object, ErrorCode>;
 
-impl Visitor<ResultObject> for Interpreter {
+impl expr::Visitor<ResultObject> for Interpreter {
     fn visit_binary_expr(&self, expr: &Binary<ResultObject, Self>) -> ResultObject {
         let right = self.evaluate(expr.right.as_ref())?;
         let left = self.evaluate(expr.left.as_ref())?;
@@ -86,21 +88,45 @@ impl Visitor<ResultObject> for Interpreter {
     }
 }
 
+impl stmt::Visitor<ResultObject, Self> for Interpreter {
+    fn visit_expression_stmt(&self, stmt: &Expression<ResultObject, Self, Self>) -> ResultObject {
+        let value = self.evaluate(stmt.expression.as_ref())?;
+        Ok(value)
+    }
+
+    fn visit_print_stmt(&self, stmt: &Print<ResultObject, Self, Self>) -> ResultObject {
+        let value = self.evaluate(stmt.expression.as_ref())?;
+        println!("{}", value);
+        Ok(value)
+    }
+}
+
 /// public method
 impl Interpreter {
-    pub fn interpret(&self, expr: &dyn Expr<ResultObject, Self>) -> Result<Object, ErrorCode> {
-        match self.evaluate(expr) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                Reporter::runtime_error(&e);
-                Err(e)
+    pub fn interpret(
+        &self,
+        statements: &[Box<dyn Stmt<ResultObject, Self, Self>>],
+    ) -> Result<Vec<Object>, ErrorCode> {
+        let mut vec = Vec::new();
+        for statement in statements {
+            match self.execute(statement.as_ref()) {
+                Ok(v) => vec.push(v),
+                Err(e) => {
+                    Reporter::runtime_error(&e);
+                }
             }
         }
+
+        Ok(vec)
     }
 }
 
 /// private methods
 impl Interpreter {
+    fn execute(&self, stmt: &dyn Stmt<ResultObject, Self, Self>) -> ResultObject {
+        stmt.accept(self)
+    }
+
     fn evaluate(&self, expr: &dyn Expr<ResultObject, Self>) -> ResultObject {
         expr.accept(self)
     }
@@ -181,6 +207,7 @@ fn check_numeric_or_string_operands(
 #[cfg(test)]
 mod interpreter_tests {
     use crate::ast::expr::{Binary, Grouping, Literal, Unary};
+    use crate::ast::stmt::{Expression, Print};
     use crate::interpreter::{Interpreter, ResultObject};
     use crate::object::Object;
     use crate::token;
@@ -195,14 +222,14 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&unary).unwrap();
+        let result = interpreter.evaluate(&unary).unwrap();
 
         assert_eq!(result, Object::from(-1.0));
     }
 
     #[test]
     fn evaluate_binary_expr() {
-        let expected: Binary<ResultObject, Interpreter> = Binary::new(
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
             Box::new(Literal::new(token::Literal::from(10))),
             Token::new(TokenKind::Plus, "+", None, 1),
             Box::new(Literal::new(token::Literal::from(10))),
@@ -210,14 +237,14 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&expected).unwrap();
+        let result = interpreter.evaluate(&expression).unwrap();
 
         assert_eq!(result, Object::from(20));
     }
 
     #[test]
     fn evaluate_complex_expr() {
-        let expected: Binary<ResultObject, Interpreter> = Binary::new(
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
             Box::new(Literal::new(token::Literal::from(10))),
             Token::new(TokenKind::Plus, "+", None, 1),
             Box::new(Binary::new(
@@ -229,14 +256,14 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&expected).unwrap();
+        let result = interpreter.evaluate(&expression).unwrap();
 
         assert_eq!(result, Object::from(110));
     }
 
     #[test]
     fn evaluate_string_and_number_expr() {
-        let expected: Binary<ResultObject, Interpreter> = Binary::new(
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
             Box::new(Literal::new(token::Literal::from("string"))),
             Token::new(TokenKind::Plus, "+", None, 1),
             Box::new(Literal::new(token::Literal::from(10))),
@@ -244,14 +271,14 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&expected).unwrap();
+        let result = interpreter.evaluate(&expression).unwrap();
 
         assert_eq!(result, Object::from("string10"));
     }
 
     #[test]
     fn error_invalid_expr() {
-        let expected: Binary<ResultObject, Interpreter> = Binary::new(
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
             Box::new(Literal::new(token::Literal::from("string"))),
             Token::new(TokenKind::Minus, "-", None, 1),
             Box::new(Literal::new(token::Literal::from(10))),
@@ -259,13 +286,14 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&expected);
+        let result = interpreter.evaluate(&expression);
 
         assert!(result.is_err());
     }
 
     #[test]
     fn evaluate_grouped_expr() {
+        // TODO: !false should be evaluate to true
         let grouping: Grouping<ResultObject, Interpreter> = Grouping::new(Box::new(Unary::new(
             Token::new(TokenKind::Bang, "!", None, 1),
             Box::new(Literal::new(token::Literal::from(false))),
@@ -273,8 +301,72 @@ mod interpreter_tests {
 
         let interpreter = Interpreter::default();
 
-        let result = interpreter.interpret(&grouping).unwrap();
+        let result = interpreter.evaluate(&grouping).unwrap();
 
         assert_eq!(result, Object::from(false));
+    }
+
+    #[test]
+    fn execute_print_complex_expr() {
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
+            Box::new(Literal::new(token::Literal::from(10))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Binary::new(
+                Box::new(Literal::new(token::Literal::from(10))),
+                Token::new(TokenKind::Star, "*", None, 1),
+                Box::new(Literal::new(token::Literal::from(10))),
+            )),
+        );
+
+        let statement = Print::new(Box::new(expression));
+
+        let interpreter = Interpreter::default();
+
+        let result = interpreter.execute(&statement).unwrap();
+
+        assert_eq!(result, Object::from(110));
+    }
+
+    #[test]
+    fn execute_expression_complex_expr() {
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
+            Box::new(Literal::new(token::Literal::from(10))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Binary::new(
+                Box::new(Literal::new(token::Literal::from(10))),
+                Token::new(TokenKind::Star, "*", None, 1),
+                Box::new(Literal::new(token::Literal::from(10))),
+            )),
+        );
+
+        let statement = Expression::new(Box::new(expression));
+
+        let interpreter = Interpreter::default();
+
+        let result = interpreter.execute(&statement).unwrap();
+
+        assert_eq!(result, Object::from(110));
+    }
+
+    #[test]
+    fn interpret_complex_expr() {
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
+            Box::new(Literal::new(token::Literal::from(10))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Binary::new(
+                Box::new(Literal::new(token::Literal::from(10))),
+                Token::new(TokenKind::Slash, "/", None, 1),
+                Box::new(Literal::new(token::Literal::from(10))),
+            )),
+        );
+
+        let statement = Expression::new(Box::new(expression));
+
+        let interpreter = Interpreter::default();
+
+        let result = interpreter.interpret(&[Box::new(statement)]).unwrap();
+        let v = result.get(0).unwrap();
+
+        assert_eq!(v, &Object::from(11));
     }
 }

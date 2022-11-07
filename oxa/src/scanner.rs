@@ -64,9 +64,6 @@ impl Scanner {
                     || self.process_ignored_char(c)
                 {
                     // Do nothing if the operation succeeds
-                } else {
-                    log::warn!("Unable to complete for character");
-                    Reporter::line_error(self.line, &format!("Unexpected character: {}", c));
                 }
                 Ok(())
             }
@@ -499,5 +496,12 @@ mod scanner_tests {
         let mut scanner = Scanner::from_source("and or print 1234 return nil idFor1234");
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 3);
+    }
+
+    #[test]
+    fn test_print_statement() {
+        let mut scanner = Scanner::from_source("print 1 + 2;");
+        scanner.scan_tokens().unwrap();
+        assert_eq!(scanner.tokens.len(), 5);
     }
 }

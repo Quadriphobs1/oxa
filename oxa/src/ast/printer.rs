@@ -1,8 +1,10 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Visitor};
+use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary};
+use crate::ast::stmt::{Expression, Print, Stmt};
+use crate::ast::{expr, stmt};
 
 pub struct AstPrinter {}
 
-impl Visitor<String> for AstPrinter {
+impl expr::Visitor<String> for AstPrinter {
     fn visit_binary_expr(&self, expr: &Binary<String, Self>) -> String {
         parenthesize(
             self,
@@ -24,9 +26,25 @@ impl Visitor<String> for AstPrinter {
     }
 }
 
+impl stmt::Visitor<String, Self> for AstPrinter {
+    fn visit_expression_stmt(&self, stmt: &Expression<String, Self, Self>) -> String {
+        let value = stmt.expression.accept(self);
+        format!("expression {}", value)
+    }
+
+    fn visit_print_stmt(&self, stmt: &Print<String, Self, Self>) -> String {
+        let value = stmt.expression.accept(self);
+        format!("print {}", value)
+    }
+}
+
 impl AstPrinter {
-    pub fn print(&self, expr: &dyn Expr<String, Self>) -> String {
+    pub fn print_expr(&self, expr: &dyn Expr<String, Self>) -> String {
         expr.accept(self)
+    }
+
+    pub fn print_stmt(&self, stmt: &dyn Stmt<String, Self, Self>) -> String {
+        stmt.accept(self)
     }
 }
 
@@ -50,7 +68,7 @@ impl AstPrinter {
 ///
 /// assert_eq!(&value, "(+ 2)");
 /// ```
-pub fn parenthesize<V: Visitor<String>>(
+pub fn parenthesize<V: expr::Visitor<String>>(
     visitor: &V,
     name: &str,
     exprs: &[&dyn Expr<String, V>],
@@ -74,6 +92,7 @@ pub fn parenthesize<V: Visitor<String>>(
 mod parenthesize_tests {
     use crate::ast::expr::{Binary, Grouping, Literal, Unary};
     use crate::ast::printer::{parenthesize, AstPrinter};
+    use crate::ast::stmt::Print;
     use crate::token;
     use crate::token::{Token, TokenKind};
 
@@ -97,7 +116,7 @@ mod parenthesize_tests {
     }
 
     #[test]
-    fn printer_test() {
+    fn print_expr_test() {
         let expr = Binary::new(
             Box::new(Unary::new(
                 Token::new(TokenKind::Minus, "-", None, 1),
@@ -109,7 +128,21 @@ mod parenthesize_tests {
             ))))),
         );
         let printer = AstPrinter {};
-        let value = printer.print(&expr);
-        assert_eq!(&value, "(* (- 123) (group 45.67))")
+        let value = printer.print_expr(&expr);
+        assert_eq!(&value, "(* (- 123) (group 45.67))");
+    }
+
+    #[test]
+    fn print_stmt_test() {
+        let expr = Binary::new(
+            Box::new(Literal::new(token::Literal::from(1))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Literal::new(token::Literal::from(2))),
+        );
+
+        let print_stmt = Print::new(Box::new(expr));
+        let printer = AstPrinter {};
+        let value = printer.print_stmt(&print_stmt);
+        assert_eq!(&value, "print (+ 1 2)");
     }
 }

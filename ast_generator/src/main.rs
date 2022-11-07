@@ -87,7 +87,7 @@ impl GenerateAst {
         writer.write_all(b"use crate::token;\n")?;
         writer.write_all(b"use std::fmt::{Display, Formatter, Result};\n")?;
         writer.write_all(b"use std::marker;\n")?;
-        writer.write_all(b"\n\n")?;
+        writer.write_all(b"\n")?;
 
         // Expr
         self.define_trait(&mut writer, base_name)?;
@@ -97,8 +97,6 @@ impl GenerateAst {
 
         // Types
         self.define_types(&mut writer, base_name, types)?;
-
-        writer.write_all(b"\n")?;
         writer.flush()?;
 
         Ok(())
@@ -109,7 +107,7 @@ impl GenerateAst {
             format!("pub trait {}<T, V: Visitor<T>>: Display {{", base_name).as_bytes(),
         )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\tfn accept(&self, visitor: &V) -> T;")?;
+        writer.write_all(b"    fn accept(&self, visitor: &V) -> T;")?;
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
@@ -130,7 +128,7 @@ impl GenerateAst {
         for (struct_name, ..) in types {
             writer.write_all(
                 format!(
-                    "\tfn visit_{}_{}(&self, expr: &{}<T, Self>) -> T;",
+                    "    fn visit_{}_{}(&self, expr: &{}<T, Self>) -> T;",
                     struct_name.to_lowercase(),
                     base_name.to_lowercase(),
                     struct_name
@@ -173,13 +171,13 @@ impl GenerateAst {
 
         // Store parameters in fields.
         for (name, field_type) in struct_fields {
-            writer.write_all(format!("\tpub {}: {},", name, field_type).as_bytes())?;
+            writer.write_all(format!("    pub {}: {},", name, field_type).as_bytes())?;
             writer.write_all(b"\n")?;
         }
 
-        writer.write_all(b"\t_marker_1: marker::PhantomData<T>,")?;
+        writer.write_all(b"    _marker_1: marker::PhantomData<T>,")?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t_marker_2: marker::PhantomData<V>,")?;
+        writer.write_all(b"    _marker_2: marker::PhantomData<V>,")?;
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
@@ -197,19 +195,19 @@ impl GenerateAst {
         writer.write_all(format!("\tpub fn new({}) -> Self  {{", arguments).as_bytes())?;
         writer.write_all(b"\n")?;
 
-        writer.write_all(format!("\t\t{} {{", struct_name).as_bytes())?;
+        writer.write_all(format!("        {} {{", struct_name).as_bytes())?;
         writer.write_all(b"\n")?;
         for (name, ..) in struct_fields {
-            writer.write_all(format!("\t\t\t{},", name).as_bytes())?;
+            writer.write_all(format!("            {},", name).as_bytes())?;
             writer.write_all(b"\n")?;
         }
-        writer.write_all(b"\t\t\t_marker_1: marker::PhantomData::default(),")?;
+        writer.write_all(b"            _marker_1: marker::PhantomData::default(),")?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t\t\t_marker_2: marker::PhantomData::default(),")?;
+        writer.write_all(b"            _marker_2: marker::PhantomData::default(),")?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t\t}")?;
+        writer.write_all(b"        }")?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t}")?;
+        writer.write_all(b"    }")?;
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
@@ -224,7 +222,7 @@ impl GenerateAst {
             .as_bytes(),
         )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\tfn accept(&self, visitor: &V) -> T {")?;
+        writer.write_all(b"    fn accept(&self, visitor: &V) -> T {")?;
         writer.write_all(b"\n")?;
         writer.write_all(
             format!(
@@ -235,7 +233,7 @@ impl GenerateAst {
             .as_bytes(),
         )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t}")?;
+        writer.write_all(b"    }")?;
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
@@ -250,7 +248,7 @@ impl GenerateAst {
             .as_bytes(),
         )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\tfn fmt(&self, f: &mut Formatter<'_>) -> Result {")?;
+        writer.write_all(b"    fn fmt(&self, f: &mut Formatter<'_>) -> Result {")?;
         writer.write_all(b"\n")?;
 
         // write!(f, "{} {} {}", self.left, self.operator, self.right)
@@ -265,10 +263,11 @@ impl GenerateAst {
             .collect::<Vec<_>>()
             .join(", ");
 
-        writer
-            .write_all(format!("\t\twrite!(f, \"{}\", {})", inner_brace, field_ref,).as_bytes())?;
+        writer.write_all(
+            format!("        write!(f, \"{}\", {})", inner_brace, field_ref,).as_bytes(),
+        )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"\t}")?;
+        writer.write_all(b"    }")?;
 
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;

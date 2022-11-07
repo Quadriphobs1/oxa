@@ -1,0 +1,15 @@
+# Git & Github
+.git
+.gitignore
+.github/*
+.devcontainer/*
+
+
+# Docker
+docker-compose.yml
+.docker
+
+# Obj files
+target/*
+coverage/*
+

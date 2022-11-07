@@ -29,6 +29,19 @@ List of supported features
 - [oxa](./oxa): The oxa language interpreter code.
 
 
+## Setup
+
+Use the following instruction to setup the environments
+
+### Requirements
+
+You must have Rust, Docker and Cargo setup on your host machine
+1. Install (just)[https://github.com/casey/just] via `cargo install just`
+
+
+### FAQ
+
+- Experiencing `permission denied` error with docker running `*.sh` file, run `chmod +x *.sh` on the file with the error
 
 ## License
 

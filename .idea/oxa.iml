@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/ast_generator/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/oxa/benches" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/oxa/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

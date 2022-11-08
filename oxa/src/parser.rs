@@ -1,4 +1,4 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::expr::{Assign, Binary, Expr, ExprKind, Grouping, Literal, Unary, Variable};
 use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
 use crate::errors::reporter::Reporter;
@@ -161,7 +161,32 @@ impl Parser {
     where
         V: expr::Visitor<T>,
     {
-        self.equality()
+        self.assignment()
+    }
+
+    /// assignment parser method
+    ///
+    /// # Rule
+    /// `expression    → assignment ;`
+    /// `assignment    → IDENTIFIER "=" assignment | equality ;`
+    pub fn assignment<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
+    where
+        V: expr::Visitor<T>,
+    {
+        let expr = self.equality()?;
+
+        if self.match_token(&[TokenKind::Equal]) {
+            let equals = self.previous()?;
+            let value = self.assignment()?;
+            if let ExprKind::Variable(v) = expr.kind() {
+                let name = &v.name;
+                return Some(Box::new(Assign::new(name.clone(), value)));
+            }
+            // The grammar is incorrect
+            Reporter::token_error(&equals, "Invalid assignment target.");
+        }
+
+        Some(expr)
     }
 
     fn equality<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>

@@ -17,10 +17,24 @@ pub struct Environment {
 impl Environment {
     /// Insert a declared variable to environment to store and can be retrieved later
     pub fn define(&mut self, name: &str, value: Object) -> Rc<RefCell<Object>> {
+        // TODO: Add error handler which checks if the variable exist and is mutable before setting the value again.
         let value = Rc::new(RefCell::new(value));
         let ret_value = value.clone();
         self.values.insert(name.to_string(), value);
         ret_value
+    }
+
+    pub fn assign(&mut self, token: &Token, value: Object) -> Option<Rc<RefCell<Object>>> {
+        let name = &token.lexeme;
+        let value = Rc::new(RefCell::new(value));
+        let ret_value = value.clone();
+        match self.values.get(name) {
+            Some(_) => {
+                self.values.insert(name.to_string(), value);
+                Some(ret_value)
+            }
+            None => None,
+        }
     }
 
     /// Get a the `Object` value of a stored variable.

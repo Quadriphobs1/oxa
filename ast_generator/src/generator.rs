@@ -294,7 +294,7 @@ impl GenerateAst {
             .map(|(a, b)| format!("{}: {}", a, b))
             .collect::<Vec<String>>()
             .join(", ");
-        writer.write_all(format!("\tpub fn new({}) -> Self  {{", arguments).as_bytes())?;
+        writer.write_all(format!("\tpub fn new({}) -> Self {{", arguments).as_bytes())?;
         writer.write_all(b"\n")?;
 
         writer.write_all(format!("        {} {{", struct_name).as_bytes())?;
@@ -326,7 +326,7 @@ impl GenerateAst {
             .as_bytes(),
         )?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"    fn accept(&self, visitor: &U) -> T {")?;
+        writer.write_all(b"    fn accept(&self, visitor: &mut U) -> T {")?;
         writer.write_all(b"\n")?;
         writer.write_all(
             format!(

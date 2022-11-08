@@ -17,17 +17,17 @@ impl ScannerBuilder {
         self
     }
 
-    pub fn line(mut self, line: usize) -> ScannerBuilder {
+    pub fn _line(mut self, line: usize) -> ScannerBuilder {
         self.line = line;
         self
     }
 
-    pub fn start(mut self, start: usize) -> ScannerBuilder {
+    pub fn _start(mut self, start: usize) -> ScannerBuilder {
         self.start = start;
         self
     }
 
-    pub fn current(mut self, current: usize) -> ScannerBuilder {
+    pub fn _current(mut self, current: usize) -> ScannerBuilder {
         self.current = current;
         self
     }
@@ -60,7 +60,7 @@ impl Scanner {
         }
     }
 
-    fn builder() -> ScannerBuilder {
+    fn _builder() -> ScannerBuilder {
         ScannerBuilder::default()
     }
 }

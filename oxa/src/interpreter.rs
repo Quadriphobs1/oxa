@@ -1,4 +1,4 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
 use crate::environment::Environment;
@@ -49,6 +49,20 @@ impl Interpreter {
 type ResultObject = Result<Object, ErrorCode>;
 
 impl expr::Visitor<ResultObject> for Interpreter {
+    fn visit_assign_expr(&self, expr: &Assign<ResultObject, Self>) -> ResultObject {
+        let value = self.evaluate(expr.value.as_ref())?;
+        // let obj = self.environment.borrow_mut().assign(&expr.name, value);
+        match self.environment.borrow_mut().assign(&expr.name, value) {
+            // TODO: Update error to reference error to unknown variable
+            // "Undefined variable '" + name.lexeme + "'.");
+            None => Err(ErrorCode::ProcessError),
+            Some(obj) => {
+                let obj_borrow = obj.borrow_mut();
+                Ok(obj_borrow.to_owned())
+            }
+        }
+    }
+
     fn visit_binary_expr(&self, expr: &Binary<ResultObject, Self>) -> ResultObject {
         let right = self.evaluate(expr.right.as_ref())?;
         let left = self.evaluate(expr.left.as_ref())?;
@@ -274,7 +288,7 @@ fn check_numeric_or_string_operands(
 
 #[cfg(test)]
 mod interpreter_tests {
-    use crate::ast::expr::{Binary, Grouping, Literal, Unary};
+    use crate::ast::expr::{Assign, Binary, Grouping, Literal, Unary};
     use crate::ast::stmt::{Expression, Let, Print};
     use crate::interpreter::{Interpreter, InterpreterBuilder, ResultObject};
     use crate::object::Object;
@@ -461,5 +475,34 @@ mod interpreter_tests {
         let v = result.get(0).unwrap();
 
         assert_eq!(v, &Object::from(11));
+    }
+
+    #[test]
+    fn execute_print_on_assign_expr() {
+        let mut interpreter = InterpreterBuilder::new().build();
+        let literal: Literal<ResultObject, Interpreter> = Literal::new(token::Literal::from(2));
+        let statement: Let<ResultObject, Interpreter, Interpreter> = Let::new(
+            Token::new(TokenKind::Identifier, "a", None, 1),
+            Box::new(literal),
+        );
+
+        interpreter.interpret(&[Box::new(statement)]).unwrap();
+
+        let expr = Binary::new(
+            Box::new(Literal::new(token::Literal::from(1))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Literal::new(token::Literal::from(2))),
+        );
+
+        let assign = Assign::new(
+            Token::new(TokenKind::Identifier, "a", None, 1),
+            Box::new(expr),
+        );
+
+        let statement = Print::new(Box::new(assign));
+
+        let result = interpreter.execute(&statement).unwrap();
+
+        assert_eq!(result, Object::from(3));
     }
 }

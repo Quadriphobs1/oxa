@@ -1,10 +1,16 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
 
 pub struct AstPrinter {}
 
 impl expr::Visitor<String> for AstPrinter {
+    fn visit_assign_expr(&self, expr: &Assign<String, Self>) -> String {
+        let value = expr.value.accept(self);
+
+        format!("{} = {}", expr.name.lexeme, value)
+    }
+
     fn visit_binary_expr(&self, expr: &Binary<String, Self>) -> String {
         parenthesize(
             self,
@@ -103,7 +109,7 @@ pub fn parenthesize<V: expr::Visitor<String>>(
 
 #[cfg(test)]
 mod parenthesize_tests {
-    use crate::ast::expr::{Binary, Grouping, Literal, Unary};
+    use crate::ast::expr::{Assign, Binary, Grouping, Literal, Unary};
     use crate::ast::printer::{parenthesize, AstPrinter};
     use crate::ast::stmt::{Let, Print};
     use crate::token;
@@ -171,5 +177,25 @@ mod parenthesize_tests {
         let mut printer = AstPrinter {};
         let value = printer.print_stmt(&print_stmt);
         assert_eq!(&value, "let (+ 1 2)");
+    }
+
+    #[test]
+    fn evaluate_assign_expr_test() {
+        let expr = Binary::new(
+            Box::new(Literal::new(token::Literal::from(1))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Literal::new(token::Literal::from(2))),
+        );
+
+        let assign = Assign::new(
+            Token::new(TokenKind::Identifier, "a", None, 1),
+            Box::new(expr),
+        );
+
+        let printer = AstPrinter {};
+
+        let value = printer.print_expr(&assign);
+
+        assert_eq!(&value, "a = (+ 1 2)");
     }
 }

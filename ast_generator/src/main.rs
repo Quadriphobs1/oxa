@@ -21,6 +21,10 @@ fn main() {
     // Generate expression ast
     let expressions = vec![
         (
+            "Assign",
+            vec![("name", "token::Token"), ("value", "Box<dyn Expr<T, V>>")],
+        ),
+        (
             "Binary",
             vec![
                 ("left", "Box<dyn Expr<T, V>>"),

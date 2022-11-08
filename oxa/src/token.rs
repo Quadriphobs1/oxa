@@ -155,10 +155,10 @@ impl str::FromStr for Literal {
     }
 }
 
-impl From<&str> for Literal {
-    fn from(s: &str) -> Self {
+impl From<i32> for Literal {
+    fn from(i: i32) -> Self {
         Literal {
-            value: LiteralKind::String(s.to_string()),
+            value: LiteralKind::Number(i),
         }
     }
 }
@@ -179,10 +179,10 @@ impl From<bool> for Literal {
     }
 }
 
-impl From<i32> for Literal {
-    fn from(i: i32) -> Self {
+impl From<&str> for Literal {
+    fn from(s: &str) -> Self {
         Literal {
-            value: LiteralKind::Number(i),
+            value: LiteralKind::String(s.to_string()),
         }
     }
 }

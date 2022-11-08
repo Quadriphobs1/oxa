@@ -58,9 +58,10 @@ impl Scanner {
                 if self.process_comparator_char_token(c)
                     || self.process_comment_char_token(c)
                     || self.process_identifier_token(c)
-                    || self.process_number_token(c)
+                    || self.process_numeric_token(c)
                     || self.process_string_token(c)
                     || self.process_single_char_token(c)
+                    || self.process_keyword_token(c)
                     || self.process_ignored_char(c)
                 {
                     // Do nothing if the operation succeeds
@@ -204,12 +205,12 @@ impl Scanner {
         }
     }
 
-    fn process_number_token(&mut self, c: char) -> bool {
+    fn process_numeric_token(&mut self, c: char) -> bool {
         match c {
-            c if is_digit(c) => {
+            c if c.is_ascii_digit() => {
                 'first_number: loop {
                     let current = self.peek(0);
-                    if current.is_some() && is_digit(current.unwrap()) {
+                    if current.is_some() && current.unwrap().is_numeric() {
                         self.advance();
                     } else {
                         break 'first_number;
@@ -220,13 +221,13 @@ impl Scanner {
                 if let Some(v) = self.peek(0) {
                     if v == '.' {
                         let next = self.peek(1);
-                        if next.is_some() && is_digit(next.unwrap()) {
+                        if next.is_some() && next.unwrap().is_numeric() {
                             // Consume the "."
                             self.advance();
 
                             'fractional_number: loop {
                                 let current = self.peek(0);
-                                if current.is_some() && is_digit(current.unwrap()) {
+                                if current.is_some() && current.unwrap().is_numeric() {
                                     self.advance();
                                 } else {
                                     break 'fractional_number;
@@ -236,17 +237,23 @@ impl Scanner {
                     }
                 }
 
-                // TODO: Parse string to double or number
-                let number = &self.source[self.start..self.current];
-                match Literal::from_str(number) {
-                    Ok(l) => {
-                        self.add_token(TokenKind::Number, Some(l));
-                        true
-                    }
-                    Err(_) => {
-                        log::warn!("Unable to convert string to number");
-                        false
-                    }
+                let string = self.get_string();
+                match self.get_string().contains('.') {
+                    false => match string.parse::<i32>() {
+                        Ok(n) => {
+                            self.add_token(TokenKind::Number, Some(Literal::from(n)));
+                            true
+                        }
+                        _ => false,
+                    },
+
+                    true => match string.parse::<f32>() {
+                        Ok(f) => {
+                            self.add_token(TokenKind::Number, Some(Literal::from(f)));
+                            true
+                        }
+                        _ => false,
+                    },
                 }
             }
             _ => false,
@@ -255,10 +262,11 @@ impl Scanner {
 
     fn process_identifier_token(&mut self, c: char) -> bool {
         match c {
-            c if is_alpha(c) => {
+            c if c.is_alphabetic() => {
+                // Consume next character until we reach a non alpha-numeric character
                 loop {
                     let current = self.peek(0);
-                    if current.is_some() && is_alpha_numeric(current.unwrap()) {
+                    if current.is_some() && current.unwrap().is_alphanumeric() {
                         self.advance();
                     } else {
                         break;
@@ -266,8 +274,8 @@ impl Scanner {
                 }
 
                 // check if there is a reserved keyword
-                let string = &self.source[self.start..self.current];
-                if KEYWORDS.get(string).is_some() {
+                let string = self.get_string();
+                if KEYWORDS.get(&string).is_some() {
                     return false;
                 }
                 self.add_token(TokenKind::Identifier, None);
@@ -299,6 +307,31 @@ impl Scanner {
         true
     }
 
+    fn process_keyword_token(&mut self, c: char) -> bool {
+        match c {
+            c if c.is_alphanumeric() => {
+                // Consume next character until we reach a non alphabetic character
+                loop {
+                    let current = self.peek(0);
+                    if current.is_some() && current.unwrap().is_alphabetic() {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+
+                let string = self.get_string();
+
+                if let Some(keyword) = KEYWORDS.get(&string) {
+                    self.add_token(keyword.clone(), None);
+                    return true;
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
     fn process_ignored_char(&mut self, c: char) -> bool {
         match c {
             // Ignore whitespace.
@@ -314,9 +347,9 @@ impl Scanner {
     fn add_token(&mut self, kind: TokenKind, literal: Option<Literal>) {
         // TODO: Try a less error prone approach to select the string slice
         // e.g collection with error validation for range
-        let lexeme = &self.source[self.start..self.current];
+        let lexeme = self.get_string();
 
-        let token = Token::new(kind, lexeme, literal, self.line);
+        let token = Token::new(kind, &lexeme, literal, self.line);
 
         self.tokens.push(token);
     }
@@ -362,17 +395,11 @@ impl Scanner {
     fn increment_current(&mut self) {
         self.current += 1;
     }
-}
 
-fn is_alpha_numeric(c: char) -> bool {
-    is_alpha(c) || is_digit(c)
-}
-fn is_digit(c: char) -> bool {
-    ('0'..='9').contains(&c)
-}
-
-fn is_alpha(c: char) -> bool {
-    ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || c == '_'
+    fn get_string(&self) -> String {
+        let lexeme = &self.source[self.start..self.current];
+        lexeme.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -495,13 +522,13 @@ mod scanner_tests {
     fn test_ignore_keywords_token() {
         let mut scanner = Scanner::from_source("and or print 1234 return nil idFor1234");
         scanner.scan_tokens().unwrap();
-        assert_eq!(scanner.tokens.len(), 3);
+        assert_eq!(scanner.tokens.len(), 8);
     }
 
     #[test]
     fn test_print_statement() {
         let mut scanner = Scanner::from_source("print 1 + 2;");
         scanner.scan_tokens().unwrap();
-        assert_eq!(scanner.tokens.len(), 5);
+        assert_eq!(scanner.tokens.len(), 6);
     }
 }

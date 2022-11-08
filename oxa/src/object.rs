@@ -125,7 +125,6 @@ impl Div for ObjectValue {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        // TODO: check for i32 / i32 that results in f32
         match self {
             ObjectValue::Number(l) => match rhs {
                 ObjectValue::Number(r) => ObjectValue::Number(l / r),

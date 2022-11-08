@@ -73,7 +73,7 @@ pub fn exit_with_return_code(res: Result<(), ErrorCode>) {
     match res {
         // if it's a success, return 0
         Ok(_) => {
-            log::debug!("Exit without any error, returning 0");
+            log::info!("Exit without any error, returning 0");
             std::process::exit(0);
         }
         // if there's an error, print an error message and return the return_code

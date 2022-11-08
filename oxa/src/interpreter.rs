@@ -1,13 +1,50 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary};
-use crate::ast::stmt::{Expression, Print, Stmt};
+use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
+use crate::environment::Environment;
 use crate::errors::reporter::Reporter;
 use crate::errors::ErrorCode;
 use crate::object::{Object, ObjectKind, ObjectValue};
 use crate::token::{Token, TokenKind};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-#[derive(Debug, Default)]
-pub struct Interpreter();
+#[derive(Default)]
+pub struct InterpreterBuilder {
+    environment: Rc<RefCell<Environment>>,
+}
+
+impl InterpreterBuilder {
+    pub fn new() -> Self {
+        InterpreterBuilder {
+            environment: Rc::new(RefCell::new(Environment::default())),
+        }
+    }
+
+    pub fn environment(mut self, environment: Rc<RefCell<Environment>>) -> Self {
+        self.environment = environment;
+        self
+    }
+
+    pub fn build(self) -> Interpreter {
+        Interpreter::new(self.environment)
+    }
+}
+
+pub struct Interpreter {
+    environment: Rc<RefCell<Environment>>,
+}
+
+/// constructor
+impl Interpreter {
+    fn new(environment: Rc<RefCell<Environment>>) -> Self {
+        Interpreter { environment }
+    }
+
+    pub fn builder() -> InterpreterBuilder {
+        InterpreterBuilder::default()
+    }
+}
 
 type ResultObject = Result<Object, ErrorCode>;
 
@@ -86,25 +123,56 @@ impl expr::Visitor<ResultObject> for Interpreter {
             _ => Err(ErrorCode::ProcessError),
         }
     }
+
+    fn visit_variable_expr(&self, expr: &Variable<ResultObject, Self>) -> ResultObject {
+        match self.environment.borrow_mut().get(&expr.name) {
+            // TODO: Update error to reference error to unknown variable
+            // "Undefined variable '" + name.lexeme + "'.");
+            None => Err(ErrorCode::ProcessError),
+            Some(obj) => Ok(obj.borrow_mut().clone()),
+        }
+    }
 }
 
 impl stmt::Visitor<ResultObject, Self> for Interpreter {
-    fn visit_expression_stmt(&self, stmt: &Expression<ResultObject, Self, Self>) -> ResultObject {
+    fn visit_expression_stmt(
+        &mut self,
+        stmt: &Expression<ResultObject, Self, Self>,
+    ) -> ResultObject {
         let value = self.evaluate(stmt.expression.as_ref())?;
         Ok(value)
     }
 
-    fn visit_print_stmt(&self, stmt: &Print<ResultObject, Self, Self>) -> ResultObject {
+    fn visit_print_stmt(&mut self, stmt: &Print<ResultObject, Self, Self>) -> ResultObject {
         let value = self.evaluate(stmt.expression.as_ref())?;
         println!("{}", value);
         Ok(value)
+    }
+
+    fn visit_let_stmt(&mut self, stmt: &Let<ResultObject, Self, Self>) -> ResultObject {
+        let obj = self
+            .environment
+            .borrow_mut()
+            .define(&stmt.name.lexeme, self.evaluate(stmt.initializer.as_ref())?);
+        let obj_borrow = obj.borrow_mut();
+        Ok(obj_borrow.to_owned())
+    }
+
+    fn visit_const_stmt(&mut self, stmt: &Const<ResultObject, Self, Self>) -> ResultObject {
+        // TODO: Make const immutable data and can't accept assign after initialisation
+        let obj = self
+            .environment
+            .borrow_mut()
+            .define(&stmt.name.lexeme, self.evaluate(stmt.initializer.as_ref())?);
+        let obj_borrow = obj.borrow_mut();
+        Ok(obj_borrow.to_owned())
     }
 }
 
 /// public method
 impl Interpreter {
     pub fn interpret(
-        &self,
+        &mut self,
         statements: &[Box<dyn Stmt<ResultObject, Self, Self>>],
     ) -> Result<Vec<Object>, ErrorCode> {
         let mut vec = Vec::new();
@@ -123,7 +191,7 @@ impl Interpreter {
 
 /// private methods
 impl Interpreter {
-    fn execute(&self, stmt: &dyn Stmt<ResultObject, Self, Self>) -> ResultObject {
+    fn execute(&mut self, stmt: &dyn Stmt<ResultObject, Self, Self>) -> ResultObject {
         stmt.accept(self)
     }
 
@@ -207,8 +275,8 @@ fn check_numeric_or_string_operands(
 #[cfg(test)]
 mod interpreter_tests {
     use crate::ast::expr::{Binary, Grouping, Literal, Unary};
-    use crate::ast::stmt::{Expression, Print};
-    use crate::interpreter::{Interpreter, ResultObject};
+    use crate::ast::stmt::{Expression, Let, Print};
+    use crate::interpreter::{Interpreter, InterpreterBuilder, ResultObject};
     use crate::object::Object;
     use crate::token;
     use crate::token::{Token, TokenKind};
@@ -220,7 +288,7 @@ mod interpreter_tests {
             Box::new(Literal::new(token::Literal::from(1.0))),
         );
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&unary).unwrap();
 
@@ -235,7 +303,7 @@ mod interpreter_tests {
             Box::new(Literal::new(token::Literal::from(10))),
         );
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&expression).unwrap();
 
@@ -254,7 +322,7 @@ mod interpreter_tests {
             )),
         );
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&expression).unwrap();
 
@@ -269,7 +337,7 @@ mod interpreter_tests {
             Box::new(Literal::new(token::Literal::from(10))),
         );
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&expression).unwrap();
 
@@ -284,7 +352,7 @@ mod interpreter_tests {
             Box::new(Literal::new(token::Literal::from(10))),
         );
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&expression);
 
@@ -299,7 +367,7 @@ mod interpreter_tests {
             Box::new(Literal::new(token::Literal::from(false))),
         )));
 
-        let interpreter = Interpreter::default();
+        let interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.evaluate(&grouping).unwrap();
 
@@ -320,7 +388,7 @@ mod interpreter_tests {
 
         let statement = Print::new(Box::new(expression));
 
-        let interpreter = Interpreter::default();
+        let mut interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.execute(&statement).unwrap();
 
@@ -341,7 +409,7 @@ mod interpreter_tests {
 
         let statement = Expression::new(Box::new(expression));
 
-        let interpreter = Interpreter::default();
+        let mut interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.execute(&statement).unwrap();
 
@@ -362,7 +430,32 @@ mod interpreter_tests {
 
         let statement = Expression::new(Box::new(expression));
 
-        let interpreter = Interpreter::default();
+        let mut interpreter = InterpreterBuilder::new().build();
+
+        let result = interpreter.interpret(&[Box::new(statement)]).unwrap();
+        let v = result.get(0).unwrap();
+
+        assert_eq!(v, &Object::from(11));
+    }
+
+    #[test]
+    fn interpret_variable_expr() {
+        let expression: Binary<ResultObject, Interpreter> = Binary::new(
+            Box::new(Literal::new(token::Literal::from(10))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Binary::new(
+                Box::new(Literal::new(token::Literal::from(10))),
+                Token::new(TokenKind::Slash, "/", None, 1),
+                Box::new(Literal::new(token::Literal::from(10))),
+            )),
+        );
+
+        let statement = Let::new(
+            Token::new(TokenKind::Identifier, "a", None, 1),
+            Box::new(expression),
+        );
+
+        let mut interpreter = InterpreterBuilder::new().build();
 
         let result = interpreter.interpret(&[Box::new(statement)]).unwrap();
         let v = result.get(0).unwrap();

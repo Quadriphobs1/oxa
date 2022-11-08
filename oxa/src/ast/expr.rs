@@ -11,6 +11,7 @@ pub trait Visitor<T> {
     fn visit_grouping_expr(&self, expr: &Grouping<T, Self>) -> T;
     fn visit_literal_expr(&self, expr: &Literal<T, Self>) -> T;
     fn visit_unary_expr(&self, expr: &Unary<T, Self>) -> T;
+    fn visit_variable_expr(&self, expr: &Variable<T, Self>) -> T;
 }
 
 pub struct Binary<T, V: ?Sized> {
@@ -132,5 +133,33 @@ impl<T, V: Visitor<T>> Expr<T, V> for Unary<T, V> {
 impl<T, V: Visitor<T>> Display for Unary<T, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{} {}", self.operator, self.right)
+    }
+}
+
+pub struct Variable<T, V: ?Sized> {
+    pub name: token::Token,
+    _marker_1: marker::PhantomData<T>,
+    _marker_2: marker::PhantomData<V>,
+}
+
+impl<T, V> Variable<T, V> {
+    pub fn new(name: token::Token) -> Self {
+        Variable {
+            name,
+            _marker_1: marker::PhantomData::default(),
+            _marker_2: marker::PhantomData::default(),
+        }
+    }
+}
+
+impl<T, V: Visitor<T>> Expr<T, V> for Variable<T, V> {
+    fn accept(&self, visitor: &V) -> T {
+        visitor.visit_variable_expr(self)
+    }
+}
+
+impl<T, V: Visitor<T>> Display for Variable<T, V> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.name)
     }
 }

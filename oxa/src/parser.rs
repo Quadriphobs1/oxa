@@ -1,5 +1,5 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary};
-use crate::ast::stmt::{Expression, Print, Stmt};
+use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
 use crate::errors::reporter::Reporter;
 use crate::errors::ErrorCode;
@@ -37,9 +37,10 @@ impl Parser {
         let mut statements: Vec<InnerStmtType<T, U, V>> = Vec::new();
 
         while !self.is_at_end() {
-            if let Some(stmt) = self.statement::<T, U, V>() {
+            if let Some(stmt) = self.declaration::<T, U, V>() {
                 statements.push(stmt);
             } else {
+                self.synchronize();
                 Reporter::line_error(self.current, "Parser error");
             }
         }
@@ -50,6 +51,22 @@ impl Parser {
 
 /// Statement parser methods
 impl Parser {
+    fn declaration<T: 'static, U: 'static, V: 'static>(&mut self) -> Option<InnerStmtType<T, U, V>>
+    where
+        U: stmt::Visitor<T, V>,
+        V: expr::Visitor<T>,
+    {
+        if self.match_token(&[TokenKind::Const]) {
+            return self.var_declaration(true);
+        }
+
+        if self.match_token(&[TokenKind::Let]) {
+            return self.var_declaration(false);
+        }
+
+        self.statement()
+    }
+
     fn statement<T: 'static, U: 'static, V: 'static>(&mut self) -> Option<InnerStmtType<T, U, V>>
     where
         U: stmt::Visitor<T, V>,
@@ -74,16 +91,43 @@ impl Parser {
         V: expr::Visitor<T>,
     {
         if let Some(expr) = self.expression::<T, V>() {
-            if self.consume(&TokenKind::SemiColon).is_none() {
-                if let Some(token) = self.peek() {
-                    self.error(&token, "Expect ';' after expression.");
-                }
-            }
+            self.check_stmt_terminal();
             let print: Print<T, U, V> = Print::new(expr);
 
             return Some(Box::new(print));
         }
         None
+    }
+
+    /// print statement parser.
+    ///
+    /// # Rule
+    /// `var_decl        → "let" IDENTIFIER ( "=" expression )? ";"
+    ///                  | "const" IDENTIFIER ( "=" expression )? ";" ;`
+    fn var_declaration<T: 'static, U: 'static, V: 'static>(
+        &mut self,
+        is_const: bool,
+    ) -> Option<InnerStmtType<T, U, V>>
+    where
+        U: stmt::Visitor<T, V>,
+        V: expr::Visitor<T>,
+    {
+        let name = self.consume(&TokenKind::Identifier)?;
+
+        let initializer = if self.match_token(&[TokenKind::Equal]) {
+            self.expression::<T, V>()?
+        } else {
+            // Make declaration `Nil` by default if there is no initializer
+            Box::new(Literal::new(token::Literal::default()))
+        };
+
+        self.check_stmt_terminal();
+
+        if is_const {
+            return Some(Box::new(Const::new(name, initializer)));
+        }
+
+        Some(Box::new(Let::new(name, initializer)))
     }
 
     /// Expression statement parser
@@ -98,11 +142,7 @@ impl Parser {
         V: expr::Visitor<T>,
     {
         if let Some(expr) = self.expression::<T, V>() {
-            if self.consume(&TokenKind::SemiColon).is_none() {
-                if let Some(token) = self.peek() {
-                    self.error(&token, "Expect ';' after expression.");
-                }
-            }
+            self.check_stmt_terminal();
             let print: Expression<T, U, V> = Expression::new(expr);
 
             return Some(Box::new(print));
@@ -208,7 +248,8 @@ impl Parser {
     /// match multiplication and division expression.
     ///
     /// # Rule
-    /// `factor -> primary ("*" | "/") primary | primary;`
+    /// `factor -> primary ("*" | "/") primary
+    ///            | primary;`
     fn factor<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: expr::Visitor<T>,
@@ -238,7 +279,8 @@ impl Parser {
     /// matches unary expression.
     ///
     /// # Rule
-    /// `unary → ("!" | "-") unary | primary;`
+    /// `unary → ("!" | "-") unary
+    ///          | primary;`
     fn unary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: expr::Visitor<T>,
@@ -260,26 +302,22 @@ impl Parser {
     /// matches primitive types or parenthesis matching.
     ///
     /// # Rule
-    /// `primary → NUMBER | STRING | "true" | "false" | "nil" | "("expression")";`
+    /// `primary → NUMBER | STRING
+    ///            | "true" | "false" | "nil"
+    ///            | "("expression")"
+    ///            | IDENTIFIER;`
     fn primary<T: 'static, V: 'static>(&mut self) -> Option<InnerExprType<T, V>>
     where
         V: expr::Visitor<T>,
     {
-        if self.match_token(&[TokenKind::Number]) {
-            // TODO: Differentiate the number types
+        if self.match_token(&[TokenKind::Identifier]) {
             return match self.previous() {
-                Some(t) => {
-                    if let Some(l) = &t.literal {
-                        return Some(Box::new(Literal::new(l.clone())));
-                    }
-
-                    None
-                }
+                Some(t) => Some(Box::new(Variable::new(t))),
                 None => None,
             };
         }
 
-        if self.match_token(&[TokenKind::String]) {
+        if self.match_token(&[TokenKind::Number, TokenKind::String]) {
             return match self.previous() {
                 Some(t) => {
                     if let Some(l) = &t.literal {
@@ -365,6 +403,14 @@ impl Parser {
         }
     }
 
+    fn check_stmt_terminal(&mut self) {
+        if self.consume(&TokenKind::SemiColon).is_none() {
+            if let Some(token) = self.peek() {
+                self.error(&token, "Expect ';' after expression.");
+            }
+        }
+    }
+
     /// return the current token and increment the count
     fn advance(&mut self) -> Option<Token> {
         if !self.is_at_end() {
@@ -397,7 +443,7 @@ impl Parser {
     }
 
     /// discards tokens until we find a statement boundary
-    fn _synchronize(&mut self) {
+    fn synchronize(&mut self) {
         self.advance();
 
         while !self.is_at_end() {
@@ -416,7 +462,8 @@ impl Parser {
             match current.unwrap().kind {
                 TokenKind::Class
                 | TokenKind::Fun
-                | TokenKind::Var
+                | TokenKind::Let
+                | TokenKind::Const
                 | TokenKind::For
                 | TokenKind::If
                 | TokenKind::While

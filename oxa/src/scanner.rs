@@ -3,8 +3,42 @@ use crate::token::{Literal, Token, TokenKind, KEYWORDS};
 
 use std::str::FromStr;
 
+#[derive(Default)]
+pub struct ScannerBuilder {
+    source: String,
+    line: usize,
+    current: usize,
+    start: usize,
+}
+
+impl ScannerBuilder {
+    pub fn source(mut self, source: &str) -> ScannerBuilder {
+        self.source = source.to_string();
+        self
+    }
+
+    pub fn line(mut self, line: usize) -> ScannerBuilder {
+        self.line = line;
+        self
+    }
+
+    pub fn start(mut self, start: usize) -> ScannerBuilder {
+        self.start = start;
+        self
+    }
+
+    pub fn current(mut self, current: usize) -> ScannerBuilder {
+        self.current = current;
+        self
+    }
+
+    pub fn build(self) -> Scanner {
+        Scanner::new(&self.source, self.start, self.current, self.line)
+    }
+}
+
 /// A code scanner using lexical grammar to tokens
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Scanner {
     source: String,
     tokens: Vec<Token>,
@@ -16,20 +50,18 @@ pub struct Scanner {
 /// Constructor implementation
 impl Scanner {
     /// Creates default scanner with empty string
-    pub fn new() -> Self {
+    fn new(source: &str, start: usize, current: usize, line: usize) -> Self {
         Scanner {
-            source: "".to_string(),
+            source: source.to_string(),
+            start,
+            current,
+            line,
             ..Self::default()
         }
     }
 
-    /// Creates a scanner from a string source and empty tokens
-    pub fn from_source(source: &str) -> Self {
-        Scanner {
-            source: source.to_string(),
-            line: 1,
-            ..Self::default()
-        }
+    fn builder() -> ScannerBuilder {
+        ScannerBuilder::default()
     }
 }
 
@@ -296,7 +328,7 @@ impl Scanner {
             '.' => self.add_token(TokenKind::Dot, None),
             '-' => self.add_token(TokenKind::Minus, None),
             '+' => self.add_token(TokenKind::Plus, None),
-            '/' => self.add_token(TokenKind::Slash, None), // TODO: Potentially be removed
+            '/' => self.add_token(TokenKind::Slash, None),
             '*' => self.add_token(TokenKind::Star, None),
             ';' => self.add_token(TokenKind::SemiColon, None),
             _ => {
@@ -408,13 +440,13 @@ mod scanner_tests {
 
     #[test]
     fn test_no_token_with_initial_creation() {
-        let scanner = Scanner::from_source("");
+        let scanner = ScannerBuilder::default().source("").build();
         assert_eq!(scanner.tokens.len(), 0);
     }
 
     #[test]
     fn test_generates_eof_token_at_default() {
-        let mut scanner = Scanner::from_source("");
+        let mut scanner = ScannerBuilder::default().source("").build();
         scanner.scan_tokens().unwrap();
 
         assert_eq!(scanner.tokens.len(), 1);
@@ -422,14 +454,14 @@ mod scanner_tests {
 
     #[test]
     fn test_generates_token_for_single_char() {
-        let mut scanner = Scanner::from_source("(");
+        let mut scanner = ScannerBuilder::default().source("(").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }
 
     #[test]
     fn test_generates_token_for_number() {
-        let mut scanner = Scanner::from_source("1");
+        let mut scanner = ScannerBuilder::default().source("1").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
         assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Number);
@@ -437,7 +469,7 @@ mod scanner_tests {
 
     #[test]
     fn test_generates_token_for_unary_number() {
-        let mut scanner = Scanner::from_source("-1");
+        let mut scanner = ScannerBuilder::default().source("-1").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 3);
         assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Minus);
@@ -446,7 +478,7 @@ mod scanner_tests {
 
     #[test]
     fn test_generates_token_for_expression() {
-        let mut scanner = Scanner::from_source("1 + 2");
+        let mut scanner = ScannerBuilder::default().source("1 + 2").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 4);
         assert_eq!(scanner.tokens.get(0).unwrap().kind, TokenKind::Number);
@@ -456,28 +488,30 @@ mod scanner_tests {
 
     #[test]
     fn test_generates_token_for_multiple_single_char() {
-        let mut scanner = Scanner::from_source("(){},.-+/*;");
+        let mut scanner = ScannerBuilder::default().source("(){},.-+/*;").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 12);
     }
 
     #[test]
     fn test_generates_token_for_single_comparator() {
-        let mut scanner = Scanner::from_source("=<>!");
+        let mut scanner = ScannerBuilder::default().source("=<>!").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 5);
     }
 
     #[test]
     fn test_generates_token_for_multi_comparator_arms() {
-        let mut scanner = Scanner::from_source("<=>=!===");
+        let mut scanner = ScannerBuilder::default().source("<=>=!===").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 5);
     }
 
     #[test]
     fn test_ignore_comment_characters() {
-        let mut scanner = Scanner::from_source("// ignored comment character");
+        let mut scanner = ScannerBuilder::default()
+            .source("// ignored comment character")
+            .build();
         scanner.scan_tokens().unwrap();
 
         assert_eq!(scanner.tokens.len(), 1);
@@ -485,49 +519,57 @@ mod scanner_tests {
 
     #[test]
     fn test_ignore_comment_line() {
-        let mut scanner = Scanner::from_source("!*+-/=<> <= == // operators");
+        let mut scanner = ScannerBuilder::default()
+            .source("!*+-/=<> <= == // operators")
+            .build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 10);
     }
 
     #[test]
     fn test_generates_token_for_strings() {
-        let mut scanner = Scanner::from_source("\"String character escapes\"");
+        let mut scanner = ScannerBuilder::default()
+            .source("\"String character escapes\"")
+            .build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }
 
     #[test]
     fn test_generates_token_for_light_string() {
-        let mut scanner = Scanner::from_source("\'String character escapes\'");
+        let mut scanner = ScannerBuilder::default()
+            .source("\'String character escapes\'")
+            .build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }
 
     #[test]
     fn test_generates_token_for_numbers() {
-        let mut scanner = Scanner::from_source("1234.567");
+        let mut scanner = ScannerBuilder::default().source("1234.567").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }
 
     #[test]
     fn test_generates_token_for_identifiers() {
-        let mut scanner = Scanner::from_source("idFor1234");
+        let mut scanner = ScannerBuilder::default().source("idFor1234").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 2);
     }
 
     #[test]
     fn test_ignore_keywords_token() {
-        let mut scanner = Scanner::from_source("and or print 1234 return nil idFor1234");
+        let mut scanner = ScannerBuilder::default()
+            .source("and or print 1234 return nil idFor1234")
+            .build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 8);
     }
 
     #[test]
     fn test_print_statement() {
-        let mut scanner = Scanner::from_source("print 1 + 2;");
+        let mut scanner = ScannerBuilder::default().source("print 1 + 2;").build();
         scanner.scan_tokens().unwrap();
         assert_eq!(scanner.tokens.len(), 6);
     }

@@ -1,5 +1,5 @@
-use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary};
-use crate::ast::stmt::{Expression, Print, Stmt};
+use crate::ast::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::ast::stmt::{Const, Expression, Let, Print, Stmt};
 use crate::ast::{expr, stmt};
 
 pub struct AstPrinter {}
@@ -24,17 +24,31 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_unary_expr(&self, expr: &Unary<String, Self>) -> String {
         parenthesize(self, &expr.operator.lexeme, &[expr.right.as_ref()])
     }
+
+    fn visit_variable_expr(&self, expr: &Variable<String, Self>) -> String {
+        expr.name.to_string()
+    }
 }
 
 impl stmt::Visitor<String, Self> for AstPrinter {
-    fn visit_expression_stmt(&self, stmt: &Expression<String, Self, Self>) -> String {
+    fn visit_expression_stmt(&mut self, stmt: &Expression<String, Self, Self>) -> String {
         let value = stmt.expression.accept(self);
         format!("expression {}", value)
     }
 
-    fn visit_print_stmt(&self, stmt: &Print<String, Self, Self>) -> String {
+    fn visit_print_stmt(&mut self, stmt: &Print<String, Self, Self>) -> String {
         let value = stmt.expression.accept(self);
         format!("print {}", value)
+    }
+
+    fn visit_let_stmt(&mut self, stmt: &Let<String, Self, Self>) -> String {
+        let value = stmt.initializer.accept(self);
+        format!("let {}", value)
+    }
+
+    fn visit_const_stmt(&mut self, stmt: &Const<String, Self, Self>) -> String {
+        let value = stmt.initializer.accept(self);
+        format!("const {}", value)
     }
 }
 
@@ -43,7 +57,7 @@ impl AstPrinter {
         expr.accept(self)
     }
 
-    pub fn print_stmt(&self, stmt: &dyn Stmt<String, Self, Self>) -> String {
+    pub fn print_stmt(&mut self, stmt: &dyn Stmt<String, Self, Self>) -> String {
         stmt.accept(self)
     }
 }
@@ -56,15 +70,14 @@ impl AstPrinter {
 /// # Example
 ///
 /// ```
-/// use oxa::{ast::{expr::{Unary, Literal}, printer::AstPrinter}, token::{Token, TokenKind}, token};
-/// use oxa::ast::printer::parenthesize;
+/// use oxa::{ast::{expr, printer}, token};
 ///
-/// let expr = Unary::new(
-///     Token::new(TokenKind::Plus, "+", None, 1),
-///     Box::new(Literal::new(token::Literal::from(2)))
+/// let expr = expr::Unary::new(
+///     token::Token::new(token::TokenKind::Plus, "+", None, 1),
+///     Box::new(expr::Literal::new(token::Literal::from(2)))
 /// );
-/// let printer = AstPrinter {};
-/// let value = parenthesize(&printer, &expr.operator.lexeme, &[expr.right.as_ref()]);
+/// let printer = printer::AstPrinter {};
+/// let value = printer::parenthesize(&printer, &expr.operator.lexeme, &[expr.right.as_ref()]);
 ///
 /// assert_eq!(&value, "(+ 2)");
 /// ```
@@ -92,7 +105,7 @@ pub fn parenthesize<V: expr::Visitor<String>>(
 mod parenthesize_tests {
     use crate::ast::expr::{Binary, Grouping, Literal, Unary};
     use crate::ast::printer::{parenthesize, AstPrinter};
-    use crate::ast::stmt::Print;
+    use crate::ast::stmt::{Let, Print};
     use crate::token;
     use crate::token::{Token, TokenKind};
 
@@ -141,8 +154,22 @@ mod parenthesize_tests {
         );
 
         let print_stmt = Print::new(Box::new(expr));
-        let printer = AstPrinter {};
+        let mut printer = AstPrinter {};
         let value = printer.print_stmt(&print_stmt);
         assert_eq!(&value, "print (+ 1 2)");
+    }
+
+    #[test]
+    fn print_variable_test() {
+        let expr = Binary::new(
+            Box::new(Literal::new(token::Literal::from(1))),
+            Token::new(TokenKind::Plus, "+", None, 1),
+            Box::new(Literal::new(token::Literal::from(2))),
+        );
+
+        let print_stmt = Let::new(Token::new(TokenKind::Let, "let", None, 1), Box::new(expr));
+        let mut printer = AstPrinter {};
+        let value = printer.print_stmt(&print_stmt);
+        assert_eq!(&value, "let (+ 1 2)");
     }
 }

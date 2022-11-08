@@ -17,7 +17,8 @@ pub static KEYWORDS: phf::Map<&'static str, TokenKind> = phf_map! {
     "super" => TokenKind::Super,
     "this" => TokenKind::This,
     "true" => TokenKind::True,
-    "var" => TokenKind::Var,
+    "let" => TokenKind::Let,
+    "const" => TokenKind::Const,
     "while" => TokenKind::While,
 };
 
@@ -66,7 +67,8 @@ pub enum TokenKind {
     Super,
     This,
     True,
-    Var,
+    Let,
+    Const,
     While,
 
     Eof,
@@ -111,7 +113,8 @@ impl fmt::Display for TokenKind {
             TokenKind::Super => write!(f, "super"),
             TokenKind::This => write!(f, "this"),
             TokenKind::True => write!(f, "true"),
-            TokenKind::Var => write!(f, "var"),
+            TokenKind::Let => write!(f, "let"),
+            TokenKind::Const => write!(f, "const"),
             TokenKind::While => write!(f, "while"),
             TokenKind::Eof => write!(f, "Eof"),
         }

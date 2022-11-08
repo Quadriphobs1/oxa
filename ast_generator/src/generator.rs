@@ -107,13 +107,13 @@ impl GenerateAst {
         writer.write_all(b"\n")?;
 
         // Expr
-        self.define_trait(&mut writer, base_name)?;
+        self.define_trait(&mut writer, base_name, "<T, V: Visitor<T>>", "&V")?;
 
         // Visitor
-        self.define_visitor(&mut writer, base_name, types)?;
+        self.define_expr_visitor(&mut writer, base_name, types)?;
 
         // Types
-        self.define_types(&mut writer, base_name, types)?;
+        self.define_expr_types(&mut writer, base_name, types)?;
         writer.flush()?;
 
         Ok(())
@@ -145,18 +145,19 @@ impl GenerateAst {
         let mut writer = LineWriter::new(file);
 
         writer.write_all(b"use crate::ast::expr::Expr;\n")?;
+        writer.write_all(b"use crate::token;\n")?;
         writer.write_all(b"use std::fmt::{Display, Formatter, Result};\n")?;
         writer.write_all(b"use std::marker;\n")?;
         writer.write_all(b"\n")?;
 
         // Expr
-        self.define_trait(&mut writer, base_name)?;
+        self.define_trait(&mut writer, base_name, "<T, U: Visitor<T, V>, V>", "&mut U")?;
 
         // Visitor
-        self.define_visitor(&mut writer, base_name, types)?;
+        self.define_stmt_visitor(&mut writer, base_name, types)?;
 
         // Types
-        self.define_types(&mut writer, base_name, types)?;
+        self.define_stmt_types(&mut writer, base_name, types)?;
         writer.flush()?;
 
         Ok(())
@@ -165,12 +166,16 @@ impl GenerateAst {
 
 /// private methods
 impl GenerateAst {
-    fn define_trait(&self, writer: &mut LineWriter<File>, base_name: &str) -> Result<()> {
-        writer.write_all(
-            format!("pub trait {}<T, V: Visitor<T>>: Display {{", base_name).as_bytes(),
-        )?;
+    fn define_trait(
+        &self,
+        writer: &mut LineWriter<File>,
+        base_name: &str,
+        generic: &str,
+        visitor: &str,
+    ) -> Result<()> {
+        writer.write_all(format!("pub trait {}{}: Display {{", base_name, generic).as_bytes())?;
         writer.write_all(b"\n")?;
-        writer.write_all(b"    fn accept(&self, visitor: &V) -> T;")?;
+        writer.write_all(format!("    fn accept(&self, visitor: {}) -> T;", visitor).as_bytes())?;
         writer.write_all(b"\n")?;
         writer.write_all(b"}")?;
 
@@ -179,7 +184,36 @@ impl GenerateAst {
         Ok(())
     }
 
-    fn define_visitor(
+    fn define_stmt_visitor(
+        &self,
+        writer: &mut LineWriter<File>,
+        base_name: &str,
+        types: &Vec<(&str, Vec<(&str, &str)>)>,
+    ) -> Result<()> {
+        writer.write_all(b"pub trait Visitor<T, V> {")?;
+        writer.write_all(b"\n")?;
+
+        for (struct_name, ..) in types {
+            writer.write_all(
+                format!(
+                    "    fn visit_{}_{}(&mut self, {}: &{}<T, Self, V>) -> T;",
+                    struct_name.to_lowercase(),
+                    base_name.to_lowercase(),
+                    base_name.to_lowercase(),
+                    struct_name
+                )
+                .as_bytes(),
+            )?;
+            writer.write_all(b"\n")?;
+        }
+
+        writer.write_all(b"}")?;
+
+        writer.write_all(b"\n\n")?;
+        Ok(())
+    }
+
+    fn define_expr_visitor(
         &self,
         writer: &mut LineWriter<File>,
         base_name: &str,
@@ -208,7 +242,7 @@ impl GenerateAst {
         Ok(())
     }
 
-    fn define_types(
+    fn define_stmt_types(
         &self,
         writer: &mut LineWriter<File>,
         base_name: &str,
@@ -216,13 +250,149 @@ impl GenerateAst {
     ) -> Result<()> {
         // The AST structs.
         for (struct_name, struct_fields) in types {
-            self.define_type(writer, base_name, struct_name, struct_fields)?;
+            self.define_stmt_type(writer, base_name, struct_name, struct_fields)?;
         }
 
         Ok(())
     }
 
-    fn define_type(
+    fn define_stmt_type(
+        &self,
+        writer: &mut LineWriter<File>,
+        base_name: &str,
+        struct_name: &str,
+        struct_fields: &Vec<(&str, &str)>,
+    ) -> Result<()> {
+        // struct definition
+        writer.write_all(
+            format!("pub struct {}<T, U: ?Sized, V: ?Sized> {{", struct_name).as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+
+        // Store parameters in fields.
+        for (name, field_type) in struct_fields {
+            writer.write_all(format!("    pub {}: {},", name, field_type).as_bytes())?;
+            writer.write_all(b"\n")?;
+        }
+
+        writer.write_all(b"    _marker_1: marker::PhantomData<T>,")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    _marker_2: marker::PhantomData<U>,")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    _marker_3: marker::PhantomData<V>,")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"}")?;
+
+        writer.write_all(b"\n\n")?;
+
+        // struct constructor
+        writer.write_all(format!("impl<T, U, V> {struct_name}<T, U, V> {{").as_bytes())?;
+        writer.write_all(b"\n")?;
+        // Pass arguments to constructor
+        let arguments = struct_fields
+            .iter()
+            .map(|(a, b)| format!("{}: {}", a, b))
+            .collect::<Vec<String>>()
+            .join(", ");
+        writer.write_all(format!("\tpub fn new({}) -> Self  {{", arguments).as_bytes())?;
+        writer.write_all(b"\n")?;
+
+        writer.write_all(format!("        {} {{", struct_name).as_bytes())?;
+        writer.write_all(b"\n")?;
+        for (name, ..) in struct_fields {
+            writer.write_all(format!("            {},", name).as_bytes())?;
+            writer.write_all(b"\n")?;
+        }
+        writer.write_all(b"            _marker_1: marker::PhantomData::default(),")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"            _marker_2: marker::PhantomData::default(),")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"            _marker_3: marker::PhantomData::default(),")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"        }")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    }")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"}")?;
+
+        writer.write_all(b"\n\n")?;
+
+        // struct trait impl
+        writer.write_all(
+            format!(
+                "impl<T, U: Visitor<T, V>, V> {}<T, U, V> for {}<T, U, V> {{",
+                base_name, struct_name
+            )
+            .as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    fn accept(&self, visitor: &U) -> T {")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(
+            format!(
+                "\t\tvisitor.visit_{}_{}(self)",
+                struct_name.to_lowercase(),
+                base_name.to_lowercase()
+            )
+            .as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    }")?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"}")?;
+
+        writer.write_all(b"\n\n")?;
+
+        // struct display trait impl
+        writer.write_all(
+            format!(
+                "impl<T, U: Visitor<T, V>, V> Display for {}<T, U, V> {{",
+                struct_name
+            )
+            .as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    fn fmt(&self, f: &mut Formatter<'_>) -> Result {")?;
+        writer.write_all(b"\n")?;
+
+        let inner_brace: String = struct_fields
+            .iter()
+            .map(|_| "{}".to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let field_ref: String = struct_fields
+            .iter()
+            .map(|(a, _)| format!("self.{}", a))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        writer.write_all(
+            format!("        write!(f, \"{}\", {})", inner_brace, field_ref,).as_bytes(),
+        )?;
+        writer.write_all(b"\n")?;
+        writer.write_all(b"    }")?;
+
+        writer.write_all(b"\n")?;
+        writer.write_all(b"}")?;
+        writer.write_all(b"\n\n")?;
+        Ok(())
+    }
+
+    fn define_expr_types(
+        &self,
+        writer: &mut LineWriter<File>,
+        base_name: &str,
+        types: &Vec<(&str, Vec<(&str, &str)>)>,
+    ) -> Result<()> {
+        // The AST structs.
+        for (struct_name, struct_fields) in types {
+            self.define_expr_type(writer, base_name, struct_name, struct_fields)?;
+        }
+
+        Ok(())
+    }
+
+    fn define_expr_type(
         &self,
         writer: &mut LineWriter<File>,
         base_name: &str,
@@ -315,7 +485,6 @@ impl GenerateAst {
         writer.write_all(b"    fn fmt(&self, f: &mut Formatter<'_>) -> Result {")?;
         writer.write_all(b"\n")?;
 
-        // write!(f, "{} {} {}", self.left, self.operator, self.right)
         let inner_brace: String = struct_fields
             .iter()
             .map(|_| "{}".to_string())

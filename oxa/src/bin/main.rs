@@ -1,3 +1,5 @@
+use oxa::{errors::exit_with_return_code, oxa::OxaBuilder};
+
 use std::env;
 
 fn main() {
@@ -7,7 +9,7 @@ fn main() {
         setup_logger(log::LevelFilter::Info)
     }
 
-    let mut oxa = oxa::oxa::Oxa::new();
+    let mut oxa = OxaBuilder::default().build();
 
     let args: Vec<String> = env::args().collect();
     match args.len() {
@@ -16,11 +18,11 @@ fn main() {
         }
         2 => {
             log::info!("Starting with a file");
-            oxa::errors::exit_with_return_code(oxa.run_file(&args[1]));
+            exit_with_return_code(oxa.run_file(&args[1]));
         }
         _ => {
             log::info!("Starting with prompt");
-            oxa::errors::exit_with_return_code(oxa.run_prompt());
+            exit_with_return_code(oxa.run_prompt());
         }
     }
 }

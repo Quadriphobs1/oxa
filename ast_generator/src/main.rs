@@ -37,6 +37,7 @@ fn main() {
                 ("right", "Box<dyn Expr<T, V>>"),
             ],
         ),
+        ("Variable", vec![("name", "token::Token")]),
     ];
     generator.define_expr_ast("Expr", &expressions).unwrap();
 
@@ -44,6 +45,20 @@ fn main() {
     let statements = vec![
         ("Expression", vec![("expression", "Box<dyn Expr<T, V>>")]),
         ("Print", vec![("expression", "Box<dyn Expr<T, V>>")]),
+        (
+            "Let",
+            vec![
+                ("name", "token::Token"),
+                ("initializer", "Box<dyn Expr<T, V>>"),
+            ],
+        ),
+        (
+            "Const",
+            vec![
+                ("name", "token::Token"),
+                ("initializer", "Box<dyn Expr<T, V>>"),
+            ],
+        ),
     ];
     generator.define_stmt_ast("Stmt", &statements).unwrap();
 

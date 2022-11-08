@@ -1,20 +1,53 @@
 use crate::errors::ErrorCode;
-use crate::interpreter::Interpreter;
+use crate::interpreter::{Interpreter, InterpreterBuilder};
 use crate::parser::Parser;
-use crate::scanner::Scanner;
-use std::fs;
+use crate::scanner::ScannerBuilder;
+use std::cell::RefCell;
 
-#[derive(Debug, Default)]
+use std::fs;
+use std::rc::Rc;
+
+pub struct OxaBuilder {
+    interpreter: Rc<RefCell<Interpreter>>,
+}
+
+impl Default for OxaBuilder {
+    fn default() -> Self {
+        OxaBuilder {
+            interpreter: Rc::new(RefCell::new(InterpreterBuilder::new().build())),
+        }
+    }
+}
+
+impl OxaBuilder {
+    pub fn interpreter(mut self, interpreter: Rc<RefCell<Interpreter>>) -> Self {
+        self.interpreter = interpreter;
+        self
+    }
+
+    pub fn build(self) -> Oxa {
+        Oxa::new(self.interpreter)
+    }
+}
+
 pub struct Oxa {
     // TODO: Handle error handle properly with Reporter
     pub error: bool,
     pub runtime_error: bool,
-    interpreter: Interpreter,
+    interpreter: Rc<RefCell<Interpreter>>,
 }
 
 impl Oxa {
-    pub fn new() -> Self {
-        Oxa::default()
+    fn new(interpreter: Rc<RefCell<Interpreter>>) -> Self {
+        Oxa {
+            error: false,
+            runtime_error: false,
+            interpreter,
+        }
+    }
+
+    pub fn builder() -> OxaBuilder {
+        OxaBuilder::default()
     }
 }
 
@@ -54,12 +87,15 @@ impl Oxa {
 /// private methods
 impl Oxa {
     fn run(&self, s: &str) -> Result<(), ErrorCode> {
-        let mut scanner = Scanner::from_source(s);
+        let mut scanner = ScannerBuilder::default().source(s).build();
 
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::from_tokens(&tokens);
         let expression = parser.parse()?;
-        let result = self.interpreter.interpret(expression.as_ref())?;
+        let result = self
+            .interpreter
+            .borrow_mut()
+            .interpret(expression.as_ref())?;
 
         println!("{:?}", result);
         Ok(())
